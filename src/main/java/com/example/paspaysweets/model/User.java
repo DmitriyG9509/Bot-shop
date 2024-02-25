@@ -26,4 +26,10 @@ public class User {
     @Column(name = "registered_at")
     private Timestamp registeredAt;
 
+    @Column(name = "duty")
+    private Long duty;
+
+    @Column(name = "cash")
+    private Long cash;
+
 }
