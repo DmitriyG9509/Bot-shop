@@ -17,4 +17,7 @@ public class Product {
 
     @Column(name = "price")
     private Long price;
+
+    @Column(name = "quantity")
+    private Long quantity;
 }
