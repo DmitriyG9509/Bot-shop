@@ -1,7 +1,10 @@
 package com.example.paspaysweets.repository;
 
-import com.example.paspaysweets.model.User;
+import com.example.paspaysweets.model.ShopUser;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface UserRepo extends JpaRepository<User, Long> {
+import java.util.Optional;
+
+public interface UserRepo extends JpaRepository<ShopUser, Long> {
+    Optional<ShopUser> findByChatId(Long chatId);
 }

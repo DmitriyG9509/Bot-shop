@@ -20,8 +20,8 @@ public class BotConfig {
     String token;
     @Value("${bot.owner.1}")
     private Long owner1;
-    @Value("${bot.owner.2}")
-    private Long owner2;
+//    @Value("${bot.owner.2}")
+//    private Long owner2;
     public List<Long> getBotOwners() {
         return Arrays.asList(owner1);
     }
