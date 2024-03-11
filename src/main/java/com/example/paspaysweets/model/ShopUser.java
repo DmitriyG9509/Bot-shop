@@ -1,6 +1,8 @@
 package com.example.paspaysweets.model;
 
 import jakarta.persistence.*;
+import jakarta.ws.rs.DefaultValue;
+import lombok.Builder;
 import lombok.Data;
 
 import java.sql.Timestamp;
@@ -31,5 +33,13 @@ public class ShopUser {
 
     @Column(name = "cash")
     private Long cash;
+    public String getUsername() {
+        return userName;
+    }
 
+    @PrePersist
+    public void prePersist() {
+        this.cash = 0L;
+        this.duty = 0L;
+    }
 }
