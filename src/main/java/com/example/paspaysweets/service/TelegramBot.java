@@ -152,22 +152,33 @@ public class TelegramBot extends TelegramLongPollingBot {
                 String targetSum = commandParts[2];
                 Optional<ShopUser> userOptional = userRepo.findByChatId(chatId);
                 if (userOptional.isEmpty()) {
-                    throw new RuntimeException("Пользователь не найден");
+                    sendMessage(chatId, "Пользователь не найден! Пожалуйста повторите запрос");
+                    return;
+
                 }
                 ShopUser user = userOptional.get();
                 var sum = user.getCash() + Long.parseLong(targetSum) - user.getDuty();
+                if (user.getDuty() == Long.parseLong(targetSum)) {
+                    user.setDuty(0L);
+                    userRepo.save(user);
+                    sendMessage(chatId, "Задолженность пользователя " + targetUserChatId + " погашена ✅");
+                    sendMessage(Long.parseLong(targetUserChatId), "Ваш долг погашен ✅");
+                    return;
+                }
                 if (sum >= 0 && user.getDuty() != 0) {
                     user.setCash(sum);
                     user.setDuty(0L);
                     userRepo.save(user);
                     sendMessage(chatId, "Баланс пользователя " + targetUserChatId + " пополнен, а так же списан его долг ✅");
                     sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс пополнен, а так же списан долг ✅");
+                    return;
                 } else if (sum >= 0 && user.getDuty() == 0) {
                     user.setCash(sum);
                     user.setDuty(0L);
                     userRepo.save(user);
                     sendMessage(chatId, "Баланс пользователя " + targetUserChatId + " пополнен ✅");
                     sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс пополнен ✅");
+                    return;
                 } else {
                     user.setCash(0L);
                     user.setDuty(-(sum));
