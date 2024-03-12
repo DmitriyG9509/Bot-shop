@@ -150,7 +150,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             try {
                 String targetUserChatId = commandParts[1];
                 String targetSum = commandParts[2];
-                Optional<ShopUser> userOptional = userRepo.findByChatId(chatId);
+                Optional<ShopUser> userOptional = userRepo.findByChatId(Long.valueOf(targetUserChatId));
                 if (userOptional.isEmpty()) {
                     sendMessage(chatId, "Пользователь не найден! Пожалуйста повторите запрос");
                     return;
@@ -473,7 +473,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void handleCancelPurchase(Long chatId, String callbackData) {
         Long productId = Long.parseLong(callbackData.split("_")[2]);
-        sendMessage(chatId, "Вы отменили покупку товара ❌" + productId);
+        sendMessage(chatId, "Вы отменили покупку товара ❌");
     }
 
     public void sendMessageWithInlineKeyboard(long chatId, String text, InlineKeyboardMarkup keyboardMarkup) {
