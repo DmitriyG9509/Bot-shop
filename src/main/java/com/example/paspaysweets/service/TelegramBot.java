@@ -2,18 +2,21 @@ package com.example.paspaysweets.service;
 
 import com.example.paspaysweets.config.BotConfig;
 import com.example.paspaysweets.model.Product;
+import com.example.paspaysweets.model.ProductCategory;
 import com.example.paspaysweets.model.ShopUser;
+import com.example.paspaysweets.repository.CategoryRepo;
 import com.example.paspaysweets.repository.ProductRepo;
 import com.example.paspaysweets.repository.UserNamesRepo;
 import com.example.paspaysweets.repository.UserRepo;
 import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -26,9 +29,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.Keyboard
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -36,27 +37,21 @@ import java.util.Optional;
 public class TelegramBot extends TelegramLongPollingBot {
 
     private final String NOT_REGISTERED = "Для взаимодействия с ботом пожалуйста зарегистрируйтесь. Напиминаю, регистрацию могут пройти только сотрудники Paspay работающие из офиса";
-    private final String INFO_TEXT = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ." +
-            ", по нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ" +
-            " Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. ";
+    private final String INFO_TEXT = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ." + ", по нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ" + " Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. ";
 
-    private final String INFO_TEXT_ADMIN = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ.\" +\n" +
-            ", по нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ\"" +
-            "Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. " +
-            "\nАдмин команды: \n/send ваше сообщение  --  рассылка сообщения всем зарегистрированным пользователям" +
-            "\n/deleteuser DmitriyGerassimenko  --  удаление пользователя и всех его данных из базы(при увольнении)" +
-            "\n/dropdata  --  сброс базы данных с продуктами(полезно например когда пришла новая партия продуктов и нужно сбросить старые)" +
-            "\n/addproduct|Nuts|200|10  --  добавление продукта в базу данных. Писать строго со всеми знаками |. /addproduct|НАЗВАНИЕ ТОВАРА|ЦЕНА ТОВАРА|КоЛИЧество товара";
+    private final String INFO_TEXT_ADMIN = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ.\" +\n" + ", по нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ\"" + "Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. " + "\nАдмин команды: \n• /send ваше сообщение  --  рассылка сообщения всем зарегистрированным пользователям" + "\n• /deleteuser DmitriyGerassimenko  --  удаление пользователя и всех его данных из базы(при увольнении)" + "\n• /dropdata  --  сброс базы данных с продуктами(полезно например когда пришла новая партия продуктов и нужно сбросить старые)" + "\n• /addproduct|Nuts|200|10|1  --  добавление продукта в базу данных. Писать строго со всеми знаками |. /addproduct|НАЗВАНИЕ ТОВАРА|ЦЕНА ТОВАРА|КоЛИЧество товара|категория товара" + "\n• /userduty 876545656  --  проверка суммы долга пользователя по chatId" + "\n• /cash|764756473|3000  --  зачисление денег на кошелек пользователя. /cash|ChatId|сумма";
     private final ProductRepo productRepo;
     private final UserRepo userRepo;
     private final BotConfig config;
     private final UserNamesRepo userNamesRepo;
+    private final CategoryRepo categoryRepo;
 
-    public TelegramBot(ProductRepo productRepo, UserRepo userRepo, BotConfig config, UserNamesRepo userNamesRepo) {
+    public TelegramBot(ProductRepo productRepo, UserRepo userRepo, BotConfig config, UserNamesRepo userNamesRepo, CategoryRepo categoryRepo) {
         this.productRepo = productRepo;
         this.userRepo = userRepo;
         this.config = config;
         this.userNamesRepo = userNamesRepo;
+        this.categoryRepo = categoryRepo;
         List<BotCommand> listofCommands = new ArrayList<>();
         listofCommands.add(new BotCommand("/start", "начало"));
         listofCommands.add(new BotCommand("/info", "информация о боте"));
@@ -101,9 +96,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                 removeUser(update);
             } else if (messageText.startsWith("/userduty") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
                 userDuty(update);
-            } else if (messageText.startsWith("/pay") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
-                closeDuty(update);
-            } else if (messageText.startsWith("/cash") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
+            }
+//            else if (messageText.startsWith("/pay") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
+//                closeDuty(update);
+//            }
+            else if (messageText.startsWith("/cash") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
                 putCash(update);
             } else {
                 switch (messageText) {
@@ -113,11 +110,23 @@ public class TelegramBot extends TelegramLongPollingBot {
                         sendMessage(chatId, responseText);
                         log.info(chatId + " requested info");
                     }
-                    case "Список продуктов" -> sendProductList(chatId);
-                    //case "Обо мне" -> sendMessage(chatId, ABOUT_ME);
+                    case "Список продуктов" -> sendProductCategories(chatId);
                     default ->
                             sendMessage(chatId, messageText.equals("/register") ? "Вы уже зарегистрированы" : "Данной команды не существует");
                 }
+            }
+        }
+        if (update.hasCallbackQuery()) {
+            CallbackQuery callbackQuery = update.getCallbackQuery();
+            Long chatId = callbackQuery.getMessage().getChatId();
+            String callbackData = callbackQuery.getData();
+
+            if (callbackData.startsWith("purchase")) {
+                handlePurchaseCallback(chatId, callbackData);
+            } else if (callbackData.startsWith("view_category")) {
+                handleCategoryCallback(chatId, callbackData);
+            } else if (callbackData.startsWith("confirm_purchase") || callbackData.startsWith("cancel_purchase")) {
+                handleConfirmationCallback(chatId, callbackData);
             }
         }
 
@@ -132,6 +141,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         return false;
     }
 
+    //Пример: /cash|chatId|5000
     @Transactional
     public void putCash(Update update) {
         String[] commandParts = update.getMessage().getText().split("\\|");
@@ -146,16 +156,24 @@ public class TelegramBot extends TelegramLongPollingBot {
                 }
                 ShopUser user = userOptional.get();
                 var sum = user.getCash() + Long.parseLong(targetSum) - user.getDuty();
-                if (sum >= 0) {
+                if (sum >= 0 && user.getDuty() != 0) {
                     user.setCash(sum);
                     user.setDuty(0L);
                     userRepo.save(user);
                     sendMessage(chatId, "Баланс пользователя " + targetUserChatId + " пополнен, а так же списан его долг ✅");
+                    sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс пополнен, а так же списан долг ✅");
+                } else if (sum >= 0 && user.getDuty() == 0) {
+                    user.setCash(sum);
+                    user.setDuty(0L);
+                    userRepo.save(user);
+                    sendMessage(chatId, "Баланс пользователя " + targetUserChatId + " пополнен ✅");
+                    sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс пополнен ✅");
                 } else {
                     user.setCash(0L);
-                    user.setDuty(sum);
+                    user.setDuty(-(sum));
                     userRepo.save(user);
-                    sendMessage(chatId, "Баланс пользователя " + targetUserChatId + " пополнен, частично списан его долг на сумму пополнения. Текущий долг " + sum);
+                    sendMessage(chatId, "Баланс пользователя " + targetUserChatId + " пополнен, частично списан его долг на сумму пополнения. Текущий долг " + (-(sum)));
+                    sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс пополнен, а так же частично списан долг ✅  Текущий долг " + (-(sum)));
                 }
             } catch (Exception e) {
                 sendMessage(chatId, "Ошибка при списании долга. Пожалуйста, попробуйте ещё раз.");
@@ -164,23 +182,23 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    //Пример: /pay|888888888|150
-    @Transactional
-    public void closeDuty(Update update) {
-        String[] commandParts = update.getMessage().getText().split("\\|");
-        var chatId = update.getMessage().getChatId();
-        if (commandParts.length == 3) {
-            try {
-                String targetUserChatId = commandParts[1];
-                String targetSum = commandParts[2];
-                userRepo.deductAmountFromDuty(Long.parseLong(targetSum), Long.parseLong(targetUserChatId));
-                sendMessage(chatId, "Долг пользователя " + targetUserChatId + " за текущую неделю погашен ✅");
-            } catch (Exception e) {
-                sendMessage(chatId, "Ошибка при списании долга. Пожалуйста, попробуйте ещё раз.");
-                log.error("Error occurred while paying duty " + chatId, e);
-            }
-        }
-    }
+//    //Пример: /pay|888888888|150
+//    @Transactional
+//    public void closeDuty(Update update) {
+//        String[] commandParts = update.getMessage().getText().split("\\|");
+//        var chatId = update.getMessage().getChatId();
+//        if (commandParts.length == 3) {
+//            try {
+//                String targetUserChatId = commandParts[1];
+//                String targetSum = commandParts[2];
+//                userRepo.deductAmountFromDuty(Long.parseLong(targetSum), Long.parseLong(targetUserChatId));
+//                sendMessage(chatId, "Долг пользователя " + targetUserChatId + " за текущую неделю погашен ✅");
+//            } catch (Exception e) {
+//                sendMessage(chatId, "Ошибка при списании долга. Пожалуйста, попробуйте ещё раз.");
+//                log.error("Error occurred while paying duty " + chatId, e);
+//            }
+//        }
+//    }
 
     private void userDuty(Update update) {
         List<ShopUser> users = userRepo.findAll();
@@ -237,16 +255,16 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    public void sendProductList(Long chatId) {
-        List<Product> products = productRepo.findAll();
+    public void sendProductCategories(Long chatId) {
+        List<ProductCategory> categories = categoryRepo.findAll();
         boolean isUserRegistered = isUserRegistered(chatId);
 
         if (isUserRegistered) {
-            if (!products.isEmpty()) {
-                for (Product product : products) {
-                    String callbackData = "purchase_product_" + product.getId();
+            if (!categories.isEmpty()) {
+                for (ProductCategory category : categories) {
+                    String callbackData = "view_category_" + category.getId();
                     InlineKeyboardMarkup keyboardMarkup = new InlineKeyboardMarkup();
-                    InlineKeyboardButton button = new InlineKeyboardButton("Приобрести");
+                    InlineKeyboardButton button = new InlineKeyboardButton(category.getCategoryName());
                     button.setCallbackData(callbackData);
                     List<InlineKeyboardButton> row = new ArrayList<>();
                     row.add(button);
@@ -254,24 +272,197 @@ public class TelegramBot extends TelegramLongPollingBot {
                     keyboard.add(row);
                     keyboardMarkup.setKeyboard(keyboard);
 
-                    StringBuilder productText = new StringBuilder();
-                    productText
-                            .append("Наименование: ").append(product.getProductName()).append("\n")
-                            .append("Цена: ").append(product.getPrice()).append("\n")
-                            .append("Имеется в наличии: ").append(product.getQuantity()).append("\n\n\n");
-
-                    sendMessageWithInlineKeyboard(chatId, productText.toString(), keyboardMarkup);
+                    sendMessageWithInlineKeyboard(chatId, getCategoryEmoji(category), keyboardMarkup);
                 }
-                log.info("The user requested product list: " + chatId);
+                log.info("The user requested product categories: " + chatId);
             } else {
-                sendMessage(chatId, "На данный момент продуктов нет, пожалуйста, оставайтесь на связи и проверяйте список, они обязательно появятся!");
-                log.info("The user requested product list, no available products now: " + chatId);
+                sendMessage(chatId, "На данный момент категорий продуктов нет, пожалуйста, оставайтесь на связи и проверяйте список, они обязательно появятся!");
+                log.info("The user requested product categories, no available categories now: " + chatId);
             }
         } else {
-            String registrationMessage = "Для доступа к списку продуктов, пожалуйста, зарегистрируйтесь.";
+            String registrationMessage = "Для доступа к категориям продуктов, пожалуйста, зарегистрируйтесь.";
             sendMessage(chatId, registrationMessage);
             log.info("User is not registered, prompting for registration: " + chatId);
         }
+    }
+
+    private String getCategoryEmoji(ProductCategory category) {
+        switch (category.getCategoryName()) {
+            case "Сладости":
+                return "\uD83C\uDF6B";
+            case "Еда":
+                return "🍔";
+            // Добавьте другие категории по мере необходимости
+            case "Напитки":
+                return "\uD83E\uDD64";
+            default:
+                return "❓";
+        }
+    }
+
+    @Scheduled(cron = "0 0 17 * * FRI")
+    public void sendFridayMessage() {
+        var users = userRepo.findAll();
+
+        for (ShopUser user : users) {
+            var userDuty = user.getDuty();
+            if (userDuty == 0) {
+                continue;
+            }
+            sendMessage(user.getChatId(), "Привет! Ваш долг за вкусняшки на сегодня составляет: " + userDuty + ". Пожалуйста, занесите денюжку в бугалтерию. Хороших выходных!");
+            ;
+        }
+        for (ShopUser user : users) {
+            var duty = user.getDuty();
+            long chatId = user.getChatId();
+            String userName = user.getUsername();
+
+            for (int i = 0; i < config.getBotOwners().toArray().length; i++) {
+                sendMessage(config.getBotOwners()
+                                  .get(i), "Пользователь " + userName + " (chatId: " + chatId + ") имеет задолженность: " + duty);
+            }
+        }
+
+    }
+
+    public void handleCategoryCallback(Long chatId, String callbackData) {
+        // Разбираем callbackData, чтобы получить categoryId
+        String[] parts = callbackData.split("_");
+        if (parts.length == 3 && parts[0].equals("view") && StringUtils.isNumeric(parts[2])) {
+            Long categoryId = Long.parseLong(parts[2]);
+
+            // Получаем товары для выбранной категории
+            List<Product> products = productRepo.findByCategoryId(categoryId);
+
+            if (!products.isEmpty()) {
+                // Создаем таблицу товаров с кнопками "приобрести"
+                InlineKeyboardMarkup keyboardMarkup = createProductTable(products);
+
+                // Отправляем сообщение с таблицей и кнопками
+                sendMessageWithInlineKeyboard(chatId, "Товары в выбранной категории:", keyboardMarkup);
+            } else {
+                sendMessage(chatId, "В данной категории пока нет товаров.");
+            }
+        } else {
+            sendMessage(chatId, "Ошибка обработки callback'а.");
+        }
+    }
+
+    private InlineKeyboardMarkup createProductTable(List<Product> products) {
+        InlineKeyboardMarkup keyboardMarkup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        for (Product product : products) {
+            if (product.getQuantity() > 0) { // Проверка наличия товара
+                // Создаем кнопку "приобрести" с уникальным callback'ом для каждого продукта
+                String callbackData = "purchase_product_" + product.getId();
+                String buttonText = product.getProductName() + " - " + product.getPrice() + " KZT"; // Обновленный текст кнопки
+                InlineKeyboardButton button = new InlineKeyboardButton(buttonText);
+                button.setCallbackData(callbackData);
+                List<InlineKeyboardButton> row = Collections.singletonList(button);
+                rows.add(row);
+            }
+        }
+
+        keyboardMarkup.setKeyboard(rows);
+        return keyboardMarkup;
+    }
+
+    public void handlePurchaseCallback(Long chatId, String callbackData) {
+        String[] parts = callbackData.split("_");
+
+        if (parts.length == 3 && parts[0].equals("purchase") && StringUtils.isNumeric(parts[2])) {
+            Long productId = Long.parseLong(parts[2]);
+            Optional<Product> optionalProductBase = productRepo.findById(productId);
+
+            if (optionalProductBase.isPresent()) {
+                Product product = optionalProductBase.get();
+
+                // Проверяем количество товара
+                if (product.getQuantity() == 0) {
+                    sendMessage(chatId, "К сожалению, товар закончился.");
+                    return;
+                }
+
+                // Отправляем сообщение с вопросом о подтверждении покупки
+                InlineKeyboardMarkup keyboardMarkup = createConfirmationKeyboard(productId);
+                sendMessageWithInlineKeyboard(chatId, "Хотите приобрести товар?", keyboardMarkup);
+            } else {
+                sendMessage(chatId, "Товар с указанным идентификатором не найден.");
+            }
+        } else {
+            sendMessage(chatId, "Произошла непредвиденная ошибка.");
+            sendMessage(config.getBotOwners().get(0), "Не удалось купить товар, ошибка.");
+        }
+    }
+
+    private InlineKeyboardMarkup createConfirmationKeyboard(Long productId) {
+        InlineKeyboardMarkup keyboardMarkup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        InlineKeyboardButton yesButton = new InlineKeyboardButton("Да");
+        yesButton.setCallbackData("confirm_purchase_" + productId);
+
+        InlineKeyboardButton noButton = new InlineKeyboardButton("Нет");
+        noButton.setCallbackData("cancel_purchase_" + productId);
+
+        List<InlineKeyboardButton> row = Arrays.asList(yesButton, noButton);
+        rows.add(row);
+
+        keyboardMarkup.setKeyboard(rows);
+        return keyboardMarkup;
+    }
+
+    public void handleConfirmationCallback(Long chatId, String callbackData) {
+        String[] parts = callbackData.split("_");
+
+        if (parts.length == 3 && parts[0].equals("confirm") && StringUtils.isNumeric(parts[2])) {
+            handleConfirmPurchase(chatId, callbackData);
+        } else if (parts.length == 3 && parts[0].equals("cancel") && StringUtils.isNumeric(parts[2])) {
+            handleCancelPurchase(chatId, callbackData);
+        } else {
+            sendMessage(chatId, "Произошла непредвиденная ошибка.");
+            sendMessage(config.getBotOwners().get(0), "Не удалось обработать подтверждение покупки, ошибка.");
+        }
+    }
+
+
+    private void handleConfirmPurchase(Long chatId, String callbackData) {
+        Long productId = Long.parseLong(callbackData.split("_")[2]);
+        Optional<Product> optionalProductBase = productRepo.findById(productId);
+        Optional<ShopUser> optionalShopUser = userRepo.findByChatId(chatId);
+
+        if (optionalProductBase.isPresent() && optionalShopUser.isPresent()) {
+            Product product = optionalProductBase.get();
+            ShopUser user = optionalShopUser.get();
+
+            // Уменьшаем количество товара
+            if (product.getQuantity() > 0) {
+                product.setQuantity(product.getQuantity() - 1);
+                productRepo.save(product);
+                var count = user.getCash() - product.getPrice();
+                if (count >= 0) {
+                    user.setCash(count);
+                    userRepo.save(user);
+                    sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
+                } else {
+                    user.setDuty((-(count)) + user.getDuty());
+                    user.setCash(0L);
+                    userRepo.save(user);
+                    sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
+                }
+            } else {
+                sendMessage(chatId, "К сожалению, товар закончился.");
+                return;
+            }
+        } else {
+            sendMessage(chatId, "Товар с указанным идентификатором не найден.");
+        }
+    }
+
+    private void handleCancelPurchase(Long chatId, String callbackData) {
+        Long productId = Long.parseLong(callbackData.split("_")[2]);
+        sendMessage(chatId, "Вы отменили покупку товара ❌" + productId);
     }
 
     public void sendMessageWithInlineKeyboard(long chatId, String text, InlineKeyboardMarkup keyboardMarkup) {
@@ -312,12 +503,12 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    //пример команды: /addproduct|Nuts|200|10
+    //пример команды: /addproduct|Nuts|200|10|1
     public void addProduct(Update update) {
         long chatId = update.getMessage().getChatId();
         String messageText = update.getMessage().getText();
         String[] parts = messageText.split("\\|");
-        if (parts.length == 4) {
+        if (parts.length == 5) {
             String productName = parts[1].trim();
             String command = "/addproduct";
             if (productName.startsWith(command)) {
@@ -325,10 +516,13 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
             Long price = Long.valueOf(parts[2].trim());
             Long quantity = Long.valueOf(parts[3].trim());
+            Long productType = Long.valueOf(parts[4].trim());
             Product product = new Product();
             product.setProductName(productName);
             product.setPrice(price);
             product.setQuantity(quantity);
+            ProductCategory category = categoryRepo.findById(productType).orElse(null);
+            product.setCategory(category);
             productRepo.save(product);
             sendMessage(chatId, "продукт " + productName + " в количестве " + quantity + " с ценой " + price + " успешно добавлен в базу ✅");
             log.info("Product added to db by user " + chatId);
@@ -343,36 +537,42 @@ public class TelegramBot extends TelegramLongPollingBot {
         long chatId = msg.getChatId();
         Chat chat = msg.getChat();
         var ifInclude = userNamesRepo.findByUserNameOffice(chat.getUserName());
+
         if (ifInclude.isPresent()) {
-            String notExistMessage = "Вы не являетесь сотрудником офиса paspay в городе Караганда. Регистрироваться могут только сотрудники которые работают в inHouse формате";
+            ShopUser user = new ShopUser();
+            user.setChatId(chatId);
+            user.setUserName(chat.getUserName());
+            user.setName(chat.getFirstName());
+            user.setRegisteredAt(new Timestamp(System.currentTimeMillis()));
+
+            userRepo.save(user);
+
+            String successMessage = "Вы успешно зарегистрированы. Теперь вы можете пользоваться функциями бота и кушоть вкусняшки \uD83C\uDF6B";
+            SendMessage successResponse = new SendMessage();
+            successResponse.setChatId(String.valueOf(chatId));
+            successResponse.setText(successMessage);
+
+            try {
+                execute(successResponse);
+            } catch (TelegramApiException e) {
+                log.error("Error occurred while sending registration success message: " + e);
+            }
+        } else {
+            String notExistMessage = "Вы не являетесь сотрудником офиса paspay в городе Караганда. Регистрироваться могут только сотрудники, которые работают в inHouse формате";
             SendMessage notExistResponse = new SendMessage();
             notExistResponse.setChatId(String.valueOf(chatId));
             notExistResponse.setText(notExistMessage);
-        }
-        ShopUser user = new ShopUser();
-        user.setChatId(chatId);
-        user.setUserName(chat.getUserName());
-        user.setName(chat.getFirstName());
-        user.setRegisteredAt(new Timestamp(System.currentTimeMillis()));
 
-        userRepo.save(user);
-
-        String successMessage = "Вы успешно зарегистрированы. Теперь вы можете пользоваться функциями бота и кушоть вкусняшки \uD83C\uDF6B";
-        SendMessage successResponse = new SendMessage();
-        successResponse.setChatId(String.valueOf(chatId));
-        successResponse.setText(successMessage);
-
-        try {
-            execute(successResponse);
-        } catch (TelegramApiException e) {
-            log.error("Error occurred while sending registration success message: " + e);
+            try {
+                execute(notExistResponse);
+            } catch (TelegramApiException e) {
+                log.error("Error occurred while sending registration failure message: " + e);
+            }
         }
     }
 
     private void startCommandReceived(long chatId, String name) {
-        String answer = "Привет, " + name + "! Я создал для того чтобы облегчить твои покупки вкусняшек в Paspay) Для дальнейшего взаимодействия со мной пожалуйста зарегистрируйся(тыкни кнопку регистрация). " +
-                "\nВот краткое описание команд и кнопок, доступных в боте: \n /start - список команд \n /register - подписаться на бота и рассылку" +
-                "\n /forgetMe - отписаться от бота \n /info - информация о боте";
+        String answer = "Привет, " + name + "! Я создан для того чтобы облегчить твои покупки вкусняшек в Paspay) Для дальнейшего взаимодействия со мной пожалуйста зарегистрируйся(в \"меню\" выберите register). " + "\nВот краткое описание команд и кнопок, доступных в боте: \n /start - список команд \n /register - подписаться на бота и рассылку" + "\n /info - информация о боте";
         log.info("Replied START command to user " + name);
         sendMessage(chatId, answer);
     }

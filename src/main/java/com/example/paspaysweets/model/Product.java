@@ -20,4 +20,8 @@ public class Product {
 
     @Column(name = "quantity")
     private Long quantity;
+
+    @ManyToOne
+    @JoinColumn(name = "category_id")
+    private ProductCategory category;
 }
