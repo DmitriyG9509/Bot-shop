@@ -320,7 +320,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                 return "\uD83C\uDF6B";
             case "Еда":
                 return "🍔";
-            // Добавьте другие категории по мере необходимости
             case "Напитки":
                 return "\uD83E\uDD64";
             default:
@@ -354,19 +353,15 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     public void handleCategoryCallback(Long chatId, String callbackData) {
-        // Разбираем callbackData, чтобы получить categoryId
         String[] parts = callbackData.split("_");
         if (parts.length == 3 && parts[0].equals("view") && StringUtils.isNumeric(parts[2])) {
             Long categoryId = Long.parseLong(parts[2]);
 
-            // Получаем товары для выбранной категории
             List<Product> products = productRepo.findByCategoryId(categoryId);
 
             if (!products.isEmpty()) {
-                // Создаем таблицу товаров с кнопками "приобрести"
                 InlineKeyboardMarkup keyboardMarkup = createProductTable(products);
 
-                // Отправляем сообщение с таблицей и кнопками
                 sendMessageWithInlineKeyboard(chatId, "Товары в выбранной категории:", keyboardMarkup);
             } else {
                 sendMessage(chatId, "В данной категории пока нет товаров.");
