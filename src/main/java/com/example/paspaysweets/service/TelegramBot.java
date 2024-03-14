@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
 import org.telegram.telegrambots.meta.api.objects.Chat;
 import org.telegram.telegrambots.meta.api.objects.Message;
@@ -96,16 +97,11 @@ public class TelegramBot extends TelegramLongPollingBot {
                 removeUser(update);
             } else if (messageText.startsWith("/userduty") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
                 userDuty(update);
-            }
-//            else if (messageText.startsWith("/pay") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
-//                closeDuty(update);
-//            }
-            else if (messageText.startsWith("/cash") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
+            } else if (messageText.startsWith("/cash") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
                 putCash(update);
             } else if (messageText.startsWith("/products") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
                 getProducts(update);
-            }
-            else {
+            } else {
                 switch (messageText) {
                     case "/start" -> startCommandReceived(chatId, update.getMessage().getChat().getFirstName());
                     case "/info" -> {
@@ -123,13 +119,13 @@ public class TelegramBot extends TelegramLongPollingBot {
             CallbackQuery callbackQuery = update.getCallbackQuery();
             Long chatId = callbackQuery.getMessage().getChatId();
             String callbackData = callbackQuery.getData();
-
+            var messageId = callbackQuery.getMessage().getMessageId();
             if (callbackData.startsWith("purchase")) {
                 handlePurchaseCallback(chatId, callbackData);
             } else if (callbackData.startsWith("view_category")) {
                 handleCategoryCallback(chatId, callbackData);
             } else if (callbackData.startsWith("confirm_purchase") || callbackData.startsWith("cancel_purchase")) {
-                handleConfirmationCallback(chatId, callbackData);
+                handleConfirmationCallback(chatId, callbackData, messageId);
             }
         }
 
@@ -187,14 +183,14 @@ public class TelegramBot extends TelegramLongPollingBot {
                     user.setDuty(0L);
                     userRepo.save(user);
                     sendMessage(chatId, "Баланс пользователя " + targetUserChatId + " пополнен, а так же списан его долг ✅");
-                    sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс пополнен, а так же списан долг ✅");
+                    sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс пополнен, а так же списан долг ✅" + " Текущий баланс составляет " + sum);
                     return;
                 } else if (sum >= 0 && user.getDuty() == 0) {
                     user.setCash(sum);
                     user.setDuty(0L);
                     userRepo.save(user);
                     sendMessage(chatId, "Баланс пользователя " + targetUserChatId + " пополнен ✅");
-                    sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс пополнен ✅");
+                    sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс пополнен и составляет" + sum + " ✅");
                     return;
                 } else {
                     user.setCash(0L);
@@ -210,23 +206,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-//    //Пример: /pay|888888888|150
-//    @Transactional
-//    public void closeDuty(Update update) {
-//        String[] commandParts = update.getMessage().getText().split("\\|");
-//        var chatId = update.getMessage().getChatId();
-//        if (commandParts.length == 3) {
-//            try {
-//                String targetUserChatId = commandParts[1];
-//                String targetSum = commandParts[2];
-//                userRepo.deductAmountFromDuty(Long.parseLong(targetSum), Long.parseLong(targetUserChatId));
-//                sendMessage(chatId, "Долг пользователя " + targetUserChatId + " за текущую неделю погашен ✅");
-//            } catch (Exception e) {
-//                sendMessage(chatId, "Ошибка при списании долга. Пожалуйста, попробуйте ещё раз.");
-//                log.error("Error occurred while paying duty " + chatId, e);
-//            }
-//        }
-//    }
 
     private void userDuty(Update update) {
         List<ShopUser> users = userRepo.findAll();
@@ -436,25 +415,32 @@ public class TelegramBot extends TelegramLongPollingBot {
         return keyboardMarkup;
     }
 
-    public void handleConfirmationCallback(Long chatId, String callbackData) {
+    public void handleConfirmationCallback(Long chatId, String callbackData, int messageId) {
         String[] parts = callbackData.split("_");
 
         if (parts.length == 3 && parts[0].equals("confirm") && StringUtils.isNumeric(parts[2])) {
-            handleConfirmPurchase(chatId, callbackData);
+            handleConfirmPurchase(chatId, callbackData, messageId);
         } else if (parts.length == 3 && parts[0].equals("cancel") && StringUtils.isNumeric(parts[2])) {
-            handleCancelPurchase(chatId, callbackData);
+            handleCancelPurchase(chatId, callbackData, messageId);
         } else {
             sendMessage(chatId, "Произошла непредвиденная ошибка.");
             sendMessage(config.getBotOwners().get(0), "Не удалось обработать подтверждение покупки, ошибка.");
         }
     }
+    private void tryDeleteMessage(Long chatId, Integer messageId) {
+        DeleteMessage deleteMessage = new DeleteMessage(chatId.toString(), messageId);
+        try {
+            execute(deleteMessage);
+        } catch (TelegramApiException e) {
+            sendMessage(config.getBotOwners().get(0), "Ошибка удаления сообщения подтверждения покупки, юзер " + chatId);
+            log.error("Ошибка удаления сообщения подтверждения покупки, юзер" + chatId);
+        }
+    }
 
-
-    private void handleConfirmPurchase(Long chatId, String callbackData) {
+    private void handleConfirmPurchase(Long chatId, String callbackData, int messageId) {
         Long productId = Long.parseLong(callbackData.split("_")[2]);
         Optional<Product> optionalProductBase = productRepo.findById(productId);
         Optional<ShopUser> optionalShopUser = userRepo.findByChatId(chatId);
-
         if (optionalProductBase.isPresent() && optionalShopUser.isPresent()) {
             Product product = optionalProductBase.get();
             ShopUser user = optionalShopUser.get();
@@ -468,11 +454,13 @@ public class TelegramBot extends TelegramLongPollingBot {
                     user.setCash(count);
                     userRepo.save(user);
                     sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
+                    tryDeleteMessage(chatId, messageId);
                 } else {
                     user.setDuty((-(count)) + user.getDuty());
                     user.setCash(0L);
                     userRepo.save(user);
                     sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
+                    tryDeleteMessage(chatId, messageId);
                 }
             } else {
                 sendMessage(chatId, "К сожалению, товар закончился.");
@@ -483,9 +471,10 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void handleCancelPurchase(Long chatId, String callbackData) {
+    private void handleCancelPurchase(Long chatId, String callbackData, int messageId) {
         Long productId = Long.parseLong(callbackData.split("_")[2]);
         sendMessage(chatId, "Вы отменили покупку товара ❌");
+        tryDeleteMessage(chatId, messageId);
     }
 
     public void sendMessageWithInlineKeyboard(long chatId, String text, InlineKeyboardMarkup keyboardMarkup) {
