@@ -109,7 +109,14 @@ public class TelegramBot extends TelegramLongPollingBot {
                         sendMessage(chatId, responseText);
                         log.info(chatId + " requested info");
                     }
-                    case "Список продуктов" -> sendProductCategories(chatId);
+                    case "Список продуктов \uD83D\uDCDD" -> sendProductCategories(chatId);
+                    case "Добавить продукт ➕" -> addProduct(update);
+                    //case "Отправить сообщение всем \uD83D\uDCE9" -> handleSendMessageToAllCommand(update);
+                    case "Удалить пользователя \uD83D\uDDD1\uFE0F" -> sendProductCategories(chatId);
+                    case "Сброс всех продуктов ❌" -> sendProductCategories(chatId);
+                    case "Проверка задолженности пользователя \uD83D\uDC6E" -> sendProductCategories(chatId);
+                    case "Пополнение баланса пользователя \uD83D\uDCB0" -> sendProductCategories(chatId);
+                    case "Список оставшихся продуктов \uD83E\uDDFE" -> sendProductCategories(chatId);
                     default ->
                             sendMessage(chatId, messageText.equals("/register") ? "Вы уже зарегистрированы" : "Данной команды не существует");
                 }
@@ -593,17 +600,56 @@ public class TelegramBot extends TelegramLongPollingBot {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
         message.setText(textToSend);
+
+        // Создаем клавиатуру с кнопками
         ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+        keyboardMarkup.setResizeKeyboard(true); // Позволяет клавиатуре подстраиваться под размер экрана
+        keyboardMarkup.setOneTimeKeyboard(true); // Клавиатура скрывается после нажатия на кнопку
+
+        // Создаем строки с кнопками
         List<KeyboardRow> keyboardRows = new ArrayList<>();
-        KeyboardRow row = new KeyboardRow();
-        row.add("Список продуктов");
-        keyboardRows.add(row);
+
+        // Добавляем кнопки в строки
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add("  Список продуктов \uD83D\uDCDD  ");
+        keyboardRows.add(row1);
+
+        if (isChatIdBotOwner(config.getBotOwners(), chatId)) {
+            KeyboardRow row2 = new KeyboardRow();
+            row2.add("  Добавить продукт ➕  ");
+            keyboardRows.add(row2);
+
+//            KeyboardRow row3 = new KeyboardRow();
+//            row3.add("  Отправить сообщение всем \uD83D\uDCE9  ");
+//            keyboardRows.add(row3);
+
+            KeyboardRow row4 = new KeyboardRow();
+            row4.add("  Удалить пользователя \uD83D\uDDD1\uFE0F  ");
+            keyboardRows.add(row4);
+
+            KeyboardRow row5 = new KeyboardRow();
+            row5.add("  Сброс всех продуктов ❌  ");
+            keyboardRows.add(row5);
+
+            KeyboardRow row6 = new KeyboardRow();
+            row6.add("  Проверка задолженности пользователя \uD83D\uDC6E  ");
+            keyboardRows.add(row6);
+
+            KeyboardRow row7 = new KeyboardRow();
+            row7.add("  Пополнение баланса пользователя \uD83D\uDCB0  ");
+            keyboardRows.add(row7);
+
+            KeyboardRow row8 = new KeyboardRow();
+            row8.add("  Список оставшихся продуктов \uD83E\uDDFE  ");
+            keyboardRows.add(row8);
+        }
         keyboardMarkup.setKeyboard(keyboardRows);
         message.setReplyMarkup(keyboardMarkup);
+
         try {
             execute(message);
         } catch (TelegramApiException e) {
-            log.error("Error occured while sending message " + e);
+            log.error("Error occurred while sending message " + e);
         }
     }
 
