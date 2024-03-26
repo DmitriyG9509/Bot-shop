@@ -26,4 +26,6 @@ public interface UserRepo extends JpaRepository<ShopUser, Long> {
     @Transactional
     @Query("UPDATE userDataTable u SET u.cash = u.cash + :amount WHERE u.chatId = :chatId")
     void increaseCash(@Param("amount") Long amount, @Param("chatId") Long chatId);
+
+    boolean existsByUserName(String userName);
 }

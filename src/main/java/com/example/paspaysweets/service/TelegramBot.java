@@ -37,8 +37,8 @@ import java.util.*;
 @Transactional
 public class TelegramBot extends TelegramLongPollingBot {
 
-    private final String NOT_REGISTERED = "Для взаимодействия с ботом пожалуйста зарегистрируйтесь. Напиминаю, регистрацию могут пройти только сотрудники Paspay работающие из офиса";
-    private final String INFO_TEXT = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ." + ", по нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ" + " Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. ";
+    private final String NOT_REGISTERED = "Для взаимодействия с ботом пожалуйста зарегистрируйтесь(введите команду /register или в меню нажмите на эту же кнопку). Напиминаю, регистрацию могут пройти только сотрудники Paspay работающие из офиса";
+    private final String INFO_TEXT = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ, по нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ" + " Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. ";
 
     private final String INFO_TEXT_ADMIN = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ.\" +\n" + ", по нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ\"" + "Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. " + "\nАдмин команды: \n• /send ваше сообщение  --  рассылка сообщения всем зарегистрированным пользователям" + "\n• /deleteuser DmitriyGerassimenko  --  удаление пользователя и всех его данных из базы(при увольнении)" + "\n• /dropdata  --  сброс базы данных с продуктами(полезно например когда пришла новая партия продуктов и нужно сбросить старые)" + "\n• /addproduct|Nuts|200|10|1  --  добавление продукта в базу данных. Писать строго со всеми знаками |. /addproduct|НАЗВАНИЕ ТОВАРА|ЦЕНА ТОВАРА|КоЛИЧество товара|категория товара" + "\n• /userduty 876545656  --  проверка суммы долга пользователя по chatId" + "\n• /cash|764756473|3000  --  зачисление денег на кошелек пользователя. /cash|ChatId|сумма" + "\n• /products  --  список продуктов, которые есть в магазине";
     private final ProductRepo productRepo;
@@ -56,7 +56,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         List<BotCommand> listofCommands = new ArrayList<>();
         listofCommands.add(new BotCommand("/start", "начало"));
         listofCommands.add(new BotCommand("/info", "информация о боте"));
-        listofCommands.add(new BotCommand("/register", "записать мои данные и подписаться на бота"));
+        listofCommands.add(new BotCommand("/register", "РЕГИСТРАЦИЯ"));
         try {
             this.execute(new SetMyCommands(listofCommands, new BotCommandScopeDefault(), null));
         } catch (TelegramApiException e) {
@@ -89,36 +89,50 @@ public class TelegramBot extends TelegramLongPollingBot {
                     sendMessage(user.getChatId(), textToSend);
                 }
                 log.info(chatId + "sended message to all by ADMIN");
-            } else if (messageText.contains("/addproduct") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
-                addProduct(update);
-            } else if (messageText.contains("/dropdata") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
-                dropData(update);
-            } else if (messageText.startsWith("/deleteuser") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
-                removeUser(update);
-            } else if (messageText.startsWith("/userduty") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
-                userDuty(update);
-            } else if (messageText.startsWith("/cash") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
-                putCash(update);
-            } else if (messageText.startsWith("/products") && isChatIdBotOwner(config.getBotOwners(), chatId)) {
-                getProducts(update);
             } else {
-                switch (messageText) {
-                    case "/start" -> startCommandReceived(chatId, update.getMessage().getChat().getFirstName());
-                    case "/info" -> {
-                        String responseText = isChatIdBotOwner(config.getBotOwners(), chatId) ? INFO_TEXT_ADMIN : INFO_TEXT;
-                        sendMessage(chatId, responseText);
-                        log.info(chatId + " requested info");
-                    }
-                    case "Список продуктов \uD83D\uDCDD" -> sendProductCategories(chatId);
-                    case "Добавить продукт ➕" -> addProduct(update);
-                    //case "Отправить сообщение всем \uD83D\uDCE9" -> handleSendMessageToAllCommand(update);
-                    case "Удалить пользователя \uD83D\uDDD1\uFE0F" -> sendProductCategories(chatId);
-                    case "Сброс всех продуктов ❌" -> sendProductCategories(chatId);
-                    case "Проверка задолженности пользователя \uD83D\uDC6E" -> sendProductCategories(chatId);
-                    case "Пополнение баланса пользователя \uD83D\uDCB0" -> sendProductCategories(chatId);
-                    case "Список оставшихся продуктов \uD83E\uDDFE" -> sendProductCategories(chatId);
-                    default ->
-                            sendMessage(chatId, messageText.equals("/register") ? "Вы уже зарегистрированы" : "Данной команды не существует");
+                switch (botState) {
+                    case WAITING_FOR_PRODUCT_INFO:
+                        // Если бот ожидает информации о продукте, передаем полученную информацию для обработки
+                        handleProductInfo(chatId, messageText);
+                        break;
+                    case WAITING_FOR_USER_NAME:
+                        // Если бот ожидает имени пользователя для удаления, передаем полученное имя для обработки
+                        removeUser(chatId, messageText);
+                        break;
+                    case WAITING_FOR_CONFIRMATION:
+                        // Бот ожидает подтверждения перед удалением всех продуктов
+                        dropData(update);
+                        break;
+                    case WAITING_FOR_USER_INFO:
+                        putCash(update);
+                        botState = BotState.IDLE; // Добавлено явное переключение состояния в IDLE
+                        break;
+                    case WAITING_FOR_MESSAGE:
+                        // Бот ожидает подтверждения перед удалением всех продуктов
+                        sendMessageToAll(update);
+                        break;
+                    case IDLE:
+                        // Если бот находится в простое, обрабатываем команды и запросы пользователя
+                        switch (messageText) {
+                            case "/start" -> startCommandReceived(chatId, update.getMessage().getChat().getFirstName());
+                            case "/info" -> {
+                                String responseText = isChatIdBotOwner(config.getBotOwners(), chatId) ? INFO_TEXT_ADMIN : INFO_TEXT;
+                                sendMessage(chatId, responseText);
+                                log.info(chatId + " requested info");
+                            }
+                            case "Список продуктов \uD83D\uDCDD" -> sendProductCategories(chatId);
+                            case "Отправить сообщение всем \uD83D\uDCE9" -> sendMessageToAll(update);
+                            case "Добавить продукт ➕" -> requestProductInfo(chatId);
+                            case "Удалить пользователя \uD83D\uDDD1\uFE0F" -> requestUserNameToDelete(chatId);
+                            case "Список оставшихся продуктов \uD83E\uDDFE" -> sendProductList(chatId);
+                            case "Сброс всех продуктов ❌" -> dropData(update);
+                            case "Проверка долгов пользователей \uD83D\uDC6E" -> userDuty(update);
+                            case "Проверка баланса пользователей \uD83D\uDCB2" -> userBalance(update);
+                            case "Пополнение баланса пользователя \uD83D\uDCB0" -> putCash(update);
+                            default ->
+                                    sendMessage(chatId, messageText.equals("/register") ? "Вы уже зарегистрированы" : "Данной команды не существует");
+                        }
+                        break;
                 }
             }
         }
@@ -147,69 +161,102 @@ public class TelegramBot extends TelegramLongPollingBot {
         return false;
     }
 
-    public void getProducts(Update update) {
-        List<Product> products = productRepo.findAll();
-        StringBuilder messageText = new StringBuilder("Список продуктов:\n");
+    public void sendMessageToAll(Update update) {
+        long chatId = update.getMessage().getChatId();
 
-        for (Product product : products) {
-            // Формируем строку с названием и количеством продукта
-            String productInfo = product.getProductName() + " - " + product.getQuantity() + " шт.\n";
-            messageText.append(productInfo);
+        switch (botState) {
+            case IDLE:
+                sendMessage(chatId, "Пожалуйста, напишите сообщение, которое вы хотите отправить всем пользователям.");
+                botState = BotState.WAITING_FOR_MESSAGE;
+                break;
+            case WAITING_FOR_MESSAGE:
+                String messageText = update.getMessage().getText();
+                if (!messageText.isEmpty()) {
+                    List<ShopUser> allUsers = userRepo.findAll();
+                    for (ShopUser user : allUsers) {
+                        long userChatId = user.getChatId();
+                        sendMessage(userChatId, messageText);
+                    }
+                    sendMessage(chatId, "Сообщение успешно отправлено всем пользователям.");
+                    botState = BotState.IDLE;
+                } else {
+                    sendMessage(chatId, "Вы не ввели текст сообщения. Пожалуйста, введите текст для отправки всем пользователям.");
+                }
+                break;
+            default:
+                sendMessage(chatId, "Пожалуйста, дождитесь завершения предыдущей операции.");
+                break;
         }
-
-        // Отправляем сформированный текст
-        sendMessage(update.getMessage().getChatId(), messageText.toString());
     }
 
-    //Пример: /cash|chatId|5000
+    //Пример: chatId&5000
     @Transactional
     public void putCash(Update update) {
-        String[] commandParts = update.getMessage().getText().split("\\|");
-        var chatId = update.getMessage().getChatId();
-        if (commandParts.length == 3) {
-            try {
-                String targetUserChatId = commandParts[1];
-                String targetSum = commandParts[2];
-                Optional<ShopUser> userOptional = userRepo.findByChatId(Long.valueOf(targetUserChatId));
-                if (userOptional.isEmpty()) {
-                    sendMessage(chatId, "Пользователь не найден! Пожалуйста повторите запрос");
-                    return;
+        long chatId = update.getMessage().getChatId();
 
-                }
-                ShopUser user = userOptional.get();
-                var sum = user.getCash() + Long.parseLong(targetSum) - user.getDuty();
-                if (user.getDuty() == Long.parseLong(targetSum)) {
-                    user.setDuty(0L);
-                    userRepo.save(user);
-                    sendMessage(chatId, "Задолженность пользователя " + targetUserChatId + " погашена ✅");
-                    sendMessage(Long.parseLong(targetUserChatId), "Ваш долг погашен ✅");
-                    return;
-                }
-                if (sum >= 0 && user.getDuty() != 0) {
-                    user.setCash(sum);
-                    user.setDuty(0L);
-                    userRepo.save(user);
-                    sendMessage(chatId, "Баланс пользователя " + targetUserChatId + " пополнен, а так же списан его долг ✅");
-                    sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс пополнен, а так же списан долг ✅" + " Текущий баланс составляет " + sum);
-                    return;
-                } else if (sum >= 0 && user.getDuty() == 0) {
-                    user.setCash(sum);
-                    user.setDuty(0L);
-                    userRepo.save(user);
-                    sendMessage(chatId, "Баланс пользователя " + targetUserChatId + " пополнен ✅");
-                    sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс пополнен и составляет" + sum + " ✅");
-                    return;
+        switch (botState) {
+            case IDLE:
+                sendMessage(chatId, "Пожалуйста, введите информацию о пользователе в формате chatId&сумма пополнения");
+                botState = BotState.WAITING_FOR_USER_INFO;
+                break;
+            case WAITING_FOR_USER_INFO:
+                String[] commandParts = update.getMessage().getText().split("&");
+                if (commandParts.length == 2) {
+                    try {
+                        String targetUserChatId = commandParts[0].trim();
+                        String targetSum = commandParts[1].trim();
+                        Optional<ShopUser> userOptional = userRepo.findByChatId(Long.valueOf(targetUserChatId));
+                        if (userOptional.isEmpty()) {
+                            sendMessage(chatId, "Пользователь с указанным chatId не найден. Пожалуйста, убедитесь, что введен корректный chatId.");
+                            botState = BotState.IDLE;
+                            return;
+                        }
+                        ShopUser user = userOptional.get();
+                        long sum = user.getCash() + Long.parseLong(targetSum) - user.getDuty();
+                        if (user.getDuty() == Long.parseLong(targetSum)) {
+                            user.setDuty(0L);
+                            userRepo.save(user);
+                            sendMessage(chatId, "Задолженность пользователя с chatId " + targetUserChatId + " успешно погашена.");
+                            sendMessage(Long.parseLong(targetUserChatId), "Ваша задолженность успешно погашена.");
+                            botState = BotState.IDLE;
+                            return;
+                        }
+                        if (sum >= 0 && user.getDuty() != 0) {
+                            user.setCash(sum);
+                            user.setDuty(0L);
+                            userRepo.save(user);
+                            sendMessage(chatId, "Баланс пользователя с chatId " + targetUserChatId + " пополнен, а также успешно погашен его долг.");
+                            sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс успешно пополнен, а также погашен долг.");
+                            botState = BotState.IDLE;
+                            return;
+                        } else if (sum >= 0 && user.getDuty() == 0) {
+                            user.setCash(sum);
+                            userRepo.save(user);
+                            sendMessage(chatId, "Баланс пользователя с chatId " + targetUserChatId + " успешно пополнен.");
+                            sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс успешно пополнен и составляет " + sum + ".");
+                            botState = BotState.IDLE;
+                            return;
+                        } else {
+                            user.setCash(0L);
+                            user.setDuty(-(sum));
+                            userRepo.save(user);
+                            sendMessage(chatId, "Баланс пользователя с chatId " + targetUserChatId + " пополнен, но только частично из-за его долга.");
+                            sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс успешно пополнен, но только частично из-за вашего долга. Ваш текущий долг: " + (-(sum)));
+                            botState = BotState.IDLE;
+                        }
+                    } catch (NumberFormatException e) {
+                        sendMessage(chatId, "Ошибка при обработке суммы пополнения. Пожалуйста, убедитесь, что введена корректная сумма.");
+                    } catch (Exception e) {
+                        sendMessage(chatId, "Произошла ошибка при пополнении баланса пользователя. Пожалуйста, попробуйте еще раз.");
+                        log.error("Error occurred while processing cash refill by user " + chatId, e);
+                    }
                 } else {
-                    user.setCash(0L);
-                    user.setDuty(-(sum));
-                    userRepo.save(user);
-                    sendMessage(chatId, "Баланс пользователя " + targetUserChatId + " пополнен, частично списан его долг на сумму пополнения. Текущий долг " + (-(sum)));
-                    sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс пополнен, а так же частично списан долг ✅  Текущий долг " + (-(sum)));
+                    sendMessage(chatId, "Неверный формат ввода. Пожалуйста, введите информацию о пользователе в формате chatId|сумма пополнения");
                 }
-            } catch (Exception e) {
-                sendMessage(chatId, "Ошибка при списании долга. Пожалуйста, попробуйте ещё раз.");
-                log.error("Error occurred while paying duty " + chatId, e);
-            }
+                break;
+            default:
+                sendMessage(chatId, "Пожалуйста, дождитесь завершения предыдущей операции.");
+                break;
         }
     }
 
@@ -236,37 +283,110 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    //пример команды:  /deleteuser DmitriyGerassimenko
-    @Transactional
-    public void removeUser(Update update) {
-        String[] commandParts = update.getMessage().getText().split(" ");
-        if (commandParts.length == 2) {
-            try {
-                String targetUserName = commandParts[1];
-                var chatId = update.getMessage().getChatId();
-                userRepo.deleteByUserName(targetUserName);
-                sendMessage(chatId, "Вы успешно удалили пользователя из списка ✅");
-                log.info("User removed from the table by user " + chatId);
-            } catch (Exception e) {
-                long chatId = update.getMessage().getChatId();
-                sendMessage(chatId, "Ошибка при удалении пользователя. Пожалуйста, попробуйте ещё раз.");
-                log.error("Error occurred while removing user by user " + chatId, e);
+    private void userBalance(Update update) {
+        List<ShopUser> users = userRepo.findAll();
+
+        if (!users.isEmpty()) {
+            StringBuilder dutyInfo = new StringBuilder("Баланс пользователей:\n");
+
+            for (ShopUser user : users) {
+                dutyInfo.append(user.getUsername())
+                        .append("   ")
+                        .append(user.getCash())
+                        .append("ТГ")
+                        .append("   ")
+                        .append(user.getChatId())
+                        .append("\n");
             }
+
+            sendMessage(update.getMessage().getChatId(), dutyInfo.toString());
+        } else {
+            sendMessage(update.getMessage().getChatId(), "Нет данных о пользователях.");
         }
     }
 
-    //пример команды: /dropdata
-    public void dropData(Update update) {
+    private void requestUserNameToDelete(long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("Введите имя пользователя, которого вы хотите удалить:");
+
         try {
-            productRepo.deleteAll();
-            long chatId = update.getMessage().getChatId();
-            sendMessage(chatId, "Все продукты успешно удалены из таблицы ✅");
-            log.info("All data dropped from the table by user " + chatId);
-        } catch (Exception e) {
-            long chatId = update.getMessage().getChatId();
-            sendMessage(chatId, "Ошибка при удалении данных. Пожалуйста, попробуйте ещё раз.");
-            log.error("Error occurred while dropping data by user " + chatId, e);
+            execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred while sending message: " + e);
         }
+        botState = BotState.WAITING_FOR_USER_NAME;
+    }
+
+    private void removeUser(long chatId, String userNameToDelete) {
+        boolean userExists = userRepo.existsByUserName(userNameToDelete);
+        if (userExists) {
+            try {
+                userRepo.deleteByUserName(userNameToDelete);
+                sendMessage(chatId, "Пользователь " + userNameToDelete + " успешно удален из базы данных.");
+                log.info("User removed from the table by user " + chatId);
+            } catch (Exception e) {
+                sendMessage(chatId, "Ошибка при удалении пользователя. Пожалуйста, попробуйте ещё раз.");
+                log.error("Error occurred while removing user by user " + chatId, e);
+                return; // Выйдем из метода, чтобы не переключить состояние бота на IDLE
+            }
+        } else {
+            sendMessage(chatId, "Пользователь с именем " + userNameToDelete + " не найден в базе данных.");
+        }
+
+        // Возвращаем состояние бота в IDLE после успешного удаления пользователя или если пользователя не существует
+        botState = BotState.IDLE;
+    }
+
+    public void dropData(Update update) {
+        // Проверяем текущее состояние бота
+        switch (botState) {
+            case WAITING_FOR_CONFIRMATION:
+                // Пользователь отправил подтверждение
+                String messageText = update.getMessage().getText();
+                if (messageText.equalsIgnoreCase("да") || messageText.equalsIgnoreCase("Да")) {
+                    try {
+                        // Удаление всех продуктов из базы данных
+                        productRepo.deleteAll();
+                        long chatId = update.getMessage().getChatId();
+                        sendMessage(chatId, "Все продукты успешно удалены из таблицы ✅");
+                        log.info("All data dropped from the table by user " + chatId);
+                    } catch (Exception e) {
+                        long chatId = update.getMessage().getChatId();
+                        sendMessage(chatId, "Ошибка при удалении данных. Пожалуйста, попробуйте ещё раз.");
+                        log.error("Error occurred while dropping data by user " + chatId, e);
+                    }
+                } else {
+                    // Если пользователь ввел что-то отличное от "да", возвращаем бота в прежнее состояние
+                    botState = BotState.IDLE;
+                }
+                break;
+            case IDLE:
+                // Бот находится в простое, отправляем запрос на подтверждение
+                sendMessage(update.getMessage()
+                                  .getChatId(), "Если действительно хотите удалить все продукты из базы, пожалуйста, напишите слово \"да\" в ответ. \nЕсли нажатие было случайным то просто проигнорируйте");
+                // Переключаем состояние бота
+                botState = BotState.WAITING_FOR_CONFIRMATION;
+                break;
+            default:
+                // В случае других состояний просто игнорируем запрос на сброс данных
+                sendMessage(update.getMessage()
+                                  .getChatId(), "Пожалуйста, завершите текущую операцию, прежде чем выполнять сброс данных.");
+                break;
+        }
+    }
+
+    public void sendProductList(Long chatId) {
+        List<Product> allProducts = productRepo.findAll();
+        StringBuilder productListMessage = new StringBuilder("Список продуктов, которые есть в магазине:\n");
+
+        for (Product product : allProducts) {
+            String productInfo = "Название: " + product.getProductName() + "\n" + "Цена: " + product.getPrice() + "\n" + "Количество: " + product.getQuantity() + "\n\n";
+            productListMessage.append(productInfo);
+        }
+
+        sendMessage(chatId, productListMessage.toString());
+        log.info("Отправлен список продуктов пользователю: " + chatId);
     }
 
     public void sendProductCategories(Long chatId) {
@@ -434,12 +554,14 @@ public class TelegramBot extends TelegramLongPollingBot {
             sendMessage(config.getBotOwners().get(0), "Не удалось обработать подтверждение покупки, ошибка.");
         }
     }
+
     private void tryDeleteMessage(Long chatId, Integer messageId) {
         DeleteMessage deleteMessage = new DeleteMessage(chatId.toString(), messageId);
         try {
             execute(deleteMessage);
         } catch (TelegramApiException e) {
-            sendMessage(config.getBotOwners().get(0), "Ошибка удаления сообщения подтверждения покупки, юзер " + chatId);
+            sendMessage(config.getBotOwners()
+                              .get(0), "Ошибка удаления сообщения подтверждения покупки, юзер " + chatId);
             log.error("Ошибка удаления сообщения подтверждения покупки, юзер" + chatId);
         }
     }
@@ -522,20 +644,76 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    //пример команды: /addproduct|Nuts|200|10|1
-    public void addProduct(Update update) {
-        long chatId = update.getMessage().getChatId();
-        String messageText = update.getMessage().getText();
-        String[] parts = messageText.split("\\|");
-        if (parts.length == 5) {
-            String productName = parts[1].trim();
-            String command = "/addproduct";
-            if (productName.startsWith(command)) {
-                productName = productName.substring(command.length()).trim();
+    enum BotState {
+        WAITING_FOR_PRODUCT_INFO, WAITING_FOR_USER_NAME, WAITING_FOR_CONFIRMATION, WAITING_FOR_USER_INFO, WAITING_FOR_MESSAGE, IDLE
+    }
+
+    BotState botState = BotState.IDLE;
+
+    // Метод для запроса информации о продукте
+    private void requestProductInfo(long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("Введите информацию о продукте в формате:\n" + "Имя продукта&Цена&Количество&Тип продукта\n" + "" + "Типы продуктов: 1 - сладости, 2 - еда, 3 - напитки");
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred while sending message: " + e);
+        }
+        botState = BotState.WAITING_FOR_PRODUCT_INFO;
+    }
+
+    // Метод для обработки полученной информации о продукте
+    private void handleProductInfo(long chatId, String productInfo) {
+        addProduct(chatId, productInfo);
+        botState = BotState.IDLE;
+    }
+
+    //пример команды Nuts&200&10&1
+    // Метод для добавления продукта в базу данных
+    private void addProduct(long chatId, String productInfo) {
+        String[] parts = productInfo.split("&");
+
+        if (parts.length == 4) {
+            String productName = parts[0].trim();
+            String priceString = parts[1].trim();
+            Long price;
+            if (!priceString.matches("\\d+")) {
+                sendMessage(chatId, "Ошибка при вводе цены. Пожалуйста, введите целое число.");
+                log.error("Invalid price format entered by user " + chatId);
+                return;
             }
-            Long price = Long.valueOf(parts[2].trim());
-            Long quantity = Long.valueOf(parts[3].trim());
-            Long productType = Long.valueOf(parts[4].trim());
+            price = Long.parseLong(priceString);
+            if (price <= 0) {
+                sendMessage(chatId, "Цена должна быть положительным числом.");
+                log.error("Invalid price value entered by user " + chatId);
+                return;
+            }
+            String quantityString = parts[2].trim();
+            Long quantity;
+            if (!quantityString.matches("\\d+")) {
+                sendMessage(chatId, "Ошибка при вводе количества. Пожалуйста, введите целое число.");
+                log.error("Invalid quantity format entered by user " + chatId);
+                return;
+            }
+            quantity = Long.parseLong(quantityString);
+            if (quantity <= 0) {
+                sendMessage(chatId, "Количество должно быть положительным числом.");
+                log.error("Invalid quantity value entered by user " + chatId);
+                return;
+            }
+            String productTypeString = parts[3].trim();
+            Long productType;
+            if (!productTypeString.matches("\\d+")) {
+                sendMessage(chatId, "Ошибка при вводе типа продукта. Пожалуйста, введите целое число.");
+                log.error("Invalid product type format entered by user " + chatId);
+                return;
+            }
+            productType = Long.parseLong(productTypeString);
+
+
+            // Создаем новый продукт и сохраняем его
             Product product = new Product();
             product.setProductName(productName);
             product.setPrice(price);
@@ -543,13 +721,15 @@ public class TelegramBot extends TelegramLongPollingBot {
             ProductCategory category = categoryRepo.findById(productType).orElse(null);
             product.setCategory(category);
             productRepo.save(product);
-            sendMessage(chatId, "продукт " + productName + " в количестве " + quantity + " с ценой " + price + " успешно добавлен в базу ✅");
+
+            // Отправляем сообщение об успешном добавлении продукта
+            sendMessage(chatId, "Продукт " + productName + " в количестве " + quantity + " с ценой " + price + " успешно добавлен в базу ✅");
             log.info("Product added to db by user " + chatId);
         } else {
-            sendMessage(chatId, "Пожалуйста, убедитесь, что ввод содержит название продукта, его цену и количество, разделенные символом '|'. Пример ввода:  Nuts|200|10");
-            log.error("Product not added, owner's mistake " + chatId);
+            // Отправляем сообщение о неправильном формате ввода
+            sendMessage(chatId, "Пожалуйста, убедитесь, что вы ввели информацию о продукте в правильном формате.");
+            log.error("Product not added, incorrect input format by user " + chatId);
         }
-
     }
 
     private void registerUser(Message msg) {
@@ -619,9 +799,9 @@ public class TelegramBot extends TelegramLongPollingBot {
             row2.add("  Добавить продукт ➕  ");
             keyboardRows.add(row2);
 
-//            KeyboardRow row3 = new KeyboardRow();
-//            row3.add("  Отправить сообщение всем \uD83D\uDCE9  ");
-//            keyboardRows.add(row3);
+            KeyboardRow row3 = new KeyboardRow();
+            row3.add("  Отправить сообщение всем \uD83D\uDCE9  ");
+            keyboardRows.add(row3);
 
             KeyboardRow row4 = new KeyboardRow();
             row4.add("  Удалить пользователя \uD83D\uDDD1\uFE0F  ");
@@ -632,16 +812,20 @@ public class TelegramBot extends TelegramLongPollingBot {
             keyboardRows.add(row5);
 
             KeyboardRow row6 = new KeyboardRow();
-            row6.add("  Проверка задолженности пользователя \uD83D\uDC6E  ");
+            row6.add("  Проверка долгов пользователей \uD83D\uDC6E  ");
             keyboardRows.add(row6);
 
             KeyboardRow row7 = new KeyboardRow();
-            row7.add("  Пополнение баланса пользователя \uD83D\uDCB0  ");
+            row6.add("  Проверка баланса пользователей \uD83D\uDCB2  ");
             keyboardRows.add(row7);
 
             KeyboardRow row8 = new KeyboardRow();
-            row8.add("  Список оставшихся продуктов \uD83E\uDDFE  ");
+            row7.add("  Пополнение баланса пользователя \uD83D\uDCB0  ");
             keyboardRows.add(row8);
+
+            KeyboardRow row9 = new KeyboardRow();
+            row8.add("  Список оставшихся продуктов \uD83E\uDDFE  ");
+            keyboardRows.add(row9);
         }
         keyboardMarkup.setKeyboard(keyboardRows);
         message.setReplyMarkup(keyboardMarkup);
@@ -662,6 +846,4 @@ public class TelegramBot extends TelegramLongPollingBot {
     public String getBotToken() {
         return config.getToken();
     }
-
-
 }
