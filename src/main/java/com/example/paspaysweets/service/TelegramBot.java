@@ -8,19 +8,18 @@ import com.example.paspaysweets.repository.CategoryRepo;
 import com.example.paspaysweets.repository.ProductRepo;
 import com.example.paspaysweets.repository.UserNamesRepo;
 import com.example.paspaysweets.repository.UserRepo;
-import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.ss.usermodel.*;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
-import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
-import org.telegram.telegrambots.meta.api.objects.Chat;
-import org.telegram.telegrambots.meta.api.objects.Message;
-import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -29,6 +28,9 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.sql.Timestamp;
 import java.util.*;
 
@@ -37,10 +39,10 @@ import java.util.*;
 @Transactional
 public class TelegramBot extends TelegramLongPollingBot {
 
-    private final String NOT_REGISTERED = "Для взаимодействия с ботом пожалуйста зарегистрируйтесь(введите команду /register или в меню нажмите на эту же кнопку). Напиминаю, регистрацию могут пройти только сотрудники Paspay работающие из офиса";
+    private final String NOT_REGISTERED = "Для взаимодействия с ботом пожалуйста зарегистрируйтесь(введите команду /register или в меню нажмите на эту же кнопку). Напоминаю, регистрацию могут пройти только сотрудники Paspay работающие из офиса";
     private final String INFO_TEXT = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ, по нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ" + " Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. ";
 
-    private final String INFO_TEXT_ADMIN = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ.\" +\n" + ", по нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ\"" + "Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. " + "\nАдмин команды: \n• /send ваше сообщение  --  рассылка сообщения всем зарегистрированным пользователям" + "\n• /deleteuser DmitriyGerassimenko  --  удаление пользователя и всех его данных из базы(при увольнении)" + "\n• /dropdata  --  сброс базы данных с продуктами(полезно например когда пришла новая партия продуктов и нужно сбросить старые)" + "\n• /addproduct|Nuts|200|10|1  --  добавление продукта в базу данных. Писать строго со всеми знаками |. /addproduct|НАЗВАНИЕ ТОВАРА|ЦЕНА ТОВАРА|КоЛИЧество товара|категория товара" + "\n• /userduty 876545656  --  проверка суммы долга пользователя по chatId" + "\n• /cash|764756473|3000  --  зачисление денег на кошелек пользователя. /cash|ChatId|сумма" + "\n• /products  --  список продуктов, которые есть в магазине";
+    private final String INFO_TEXT_ADMIN = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ." + " По нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ\"" + "Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. " + "\n➡\uFE0F Описание кнопок, которые доступны только админам: \n\uD83D\uDFE2 список продуктов  --  выводит список продуктов для покупки" + "\n\uD83D\uDFE2 добавить продукт  --  после нажатия кнопки боту нужно отправить файл в формате excel. Пожалуйста заполняйте только в определенном формате. За инструкцией обратитесь к Дмитрию" + "\n\uD83D\uDFE2 отправить сообщение всем  --  после нажатия кнопки бот попросит отправить ему нужное сообщение для рассылки." + "\n\uD83D\uDFE2 удалить пользователя  --  после нажатия кнопки нужно ввести имя пользователя, userName из телеграм. Получить имя можно например кнопкой ПРОВЕРКА БАЛАНСА ПОЛЬЗОВАТЕЛЕЙ." + "\n\uD83D\uDFE2  сброс всех продуктов  --  Производится сброс всех продуктов из базы данных. ВНИМАНИЕ! продукты и данные о них будут удалены безвозвратно! Для подтверждения действия нужно будет ввести на клавиатуре слово \"да\"" + "\n\uD83D\uDFE2 проверка долгов пользователей  --  в ответ отдает таблицу всех пользователей с их задолженностями" + "\n\uD83D\uDFE2 проверка баланса пользователей  --  отдает таблицу с балансом всех пользователей(кошелек, если кто-то например положил деньги заранее)" + "\n\uD83D\uDFE2 пополнение баланса пользователя  --  в ответ боту нужно ввести сообщение в виде chatId&сумма пополнения(84857584&400). Таблицу с chatId будет у вас в распечатанном виде, так же можно посмотреть его с помощью кнопки БАЛАНС ПОЛЬЗОВАТЕЛЕЙ" + "\n\uD83D\uDFE2 список продуктов  --  выдает список продуктов, которые есть в магазине в формате название-цена-количество";
     private final ProductRepo productRepo;
     private final UserRepo userRepo;
     private final BotConfig config;
@@ -91,10 +93,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                 log.info(chatId + "sended message to all by ADMIN");
             } else {
                 switch (botState) {
-                    case WAITING_FOR_PRODUCT_INFO:
-                        // Если бот ожидает информации о продукте, передаем полученную информацию для обработки
-                        handleProductInfo(chatId, messageText);
-                        break;
                     case WAITING_FOR_USER_NAME:
                         // Если бот ожидает имени пользователя для удаления, передаем полученное имя для обработки
                         removeUser(chatId, messageText);
@@ -136,6 +134,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                 }
             }
         }
+        if (update.hasMessage() && update.getMessage().hasDocument()) {
+            processExcelFile(update);
+        }
         if (update.hasCallbackQuery()) {
             CallbackQuery callbackQuery = update.getCallbackQuery();
             Long chatId = callbackQuery.getMessage().getChatId();
@@ -159,6 +160,62 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
         }
         return false;
+    }
+
+    @Transactional(rollbackFor = IllegalArgumentException.class)
+    protected void processExcelFile(Update update) {
+        List<Product> products = new ArrayList<>();
+        Message message = update.getMessage();
+        Document document = message.getDocument(); // Получаем информацию о документе
+        if (document != null) {
+            GetFile getFile = new GetFile();
+            getFile.setFileId(document.getFileId());
+            try {
+                File file = execute(getFile);
+                InputStream inputStream = new URL("https://api.telegram.org/file/bot" + getBotToken() + "/" + file.getFilePath()).openStream();
+                Workbook workbook = WorkbookFactory.create(inputStream);
+                Sheet sheet = workbook.getSheetAt(0); // Предполагается, что информация о продуктах находится в первом листе
+                for (int i = 1; i < sheet.getPhysicalNumberOfRows(); i++) {
+                    Row row = sheet.getRow(i);
+
+                    // Обработка каждой строки в файле Excel
+                    Cell productNameCell = row.getCell(1); // Столбец с именем продукта
+                    if (productNameCell == null || productNameCell.getCellType() == CellType.BLANK) {
+                        break;
+                    }
+                    Cell priceCell = row.getCell(0); // Столбец с ценой
+                    Cell quantityCell = row.getCell(2); // Столбец с количеством
+                    Cell productTypeCell = row.getCell(3); // Столбец с категорией товара
+
+                    try {
+                        String productName = productNameCell.getStringCellValue();
+                        long price = (long) priceCell.getNumericCellValue();
+                        long quantity = (long) quantityCell.getNumericCellValue();
+                        long productType = (long) productTypeCell.getNumericCellValue();
+                        Product product = new Product();
+                        product.setProductName(productName);
+                        product.setPrice(price);
+                        product.setQuantity(quantity);
+                        ProductCategory category = categoryRepo.findById(productType).orElse(null);
+                        product.setCategory(category);
+                        products.add(product);
+                    } catch (RuntimeException e) {
+                        for (int j = 0; j < config.getBotOwners().size(); j++) {
+                            sendMessage(config.getBotOwners()
+                                              .get(j), "при добавлении продуктов в excel файле введены не коррректные данные. Пожалуйста, произведите сброс базы данных и повторите попытку.");
+                        }
+                        log.error("Некорректные данные в excel файле при добавлении продуктов от пользователя - " + update.getMessage()
+                                                                                                                          .getChatId());
+                        throw new IllegalArgumentException("Некорректные данные в excel файле при добавлении продуктов");
+                    }
+
+                }
+                productRepo.saveAll(products);
+            } catch (IOException | TelegramApiException e) {
+                log.error("Error occurred while processing Excel file: " + e);
+            }
+            sendMessage(update.getMessage().getChatId(), "Продукты, находящиеся в файле успешно добавлены");
+        }
     }
 
     public void sendMessageToAll(Update update) {
@@ -189,7 +246,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    //Пример: chatId&5000
     @Transactional
     public void putCash(Update update) {
         long chatId = update.getMessage().getChatId();
@@ -259,7 +315,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                 break;
         }
     }
-
 
     private void userDuty(Update update) {
         List<ShopUser> users = userRepo.findAll();
@@ -645,7 +700,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     enum BotState {
-        WAITING_FOR_PRODUCT_INFO, WAITING_FOR_USER_NAME, WAITING_FOR_CONFIRMATION, WAITING_FOR_USER_INFO, WAITING_FOR_MESSAGE, IDLE
+        WAITING_FOR_USER_NAME, WAITING_FOR_CONFIRMATION, WAITING_FOR_USER_INFO, WAITING_FOR_MESSAGE, IDLE
     }
 
     BotState botState = BotState.IDLE;
@@ -654,81 +709,12 @@ public class TelegramBot extends TelegramLongPollingBot {
     private void requestProductInfo(long chatId) {
         SendMessage message = new SendMessage();
         message.setChatId(String.valueOf(chatId));
-        message.setText("Введите информацию о продукте в формате:\n" + "Имя продукта&Цена&Количество&Тип продукта\n" + "" + "Типы продуктов: 1 - сладости, 2 - еда, 3 - напитки");
+        message.setText("Пожалуйста отправьте мне файл со списком продуктов, которые вы желаете добавить в формате excel\n" + "Пожалуйста, используйте строгий шаблон для этой цели, который вам был предоставлен");
 
         try {
             execute(message);
         } catch (TelegramApiException e) {
             log.error("Error occurred while sending message: " + e);
-        }
-        botState = BotState.WAITING_FOR_PRODUCT_INFO;
-    }
-
-    // Метод для обработки полученной информации о продукте
-    private void handleProductInfo(long chatId, String productInfo) {
-        addProduct(chatId, productInfo);
-        botState = BotState.IDLE;
-    }
-
-    //пример команды Nuts&200&10&1
-    // Метод для добавления продукта в базу данных
-    private void addProduct(long chatId, String productInfo) {
-        String[] parts = productInfo.split("&");
-
-        if (parts.length == 4) {
-            String productName = parts[0].trim();
-            String priceString = parts[1].trim();
-            Long price;
-            if (!priceString.matches("\\d+")) {
-                sendMessage(chatId, "Ошибка при вводе цены. Пожалуйста, введите целое число.");
-                log.error("Invalid price format entered by user " + chatId);
-                return;
-            }
-            price = Long.parseLong(priceString);
-            if (price <= 0) {
-                sendMessage(chatId, "Цена должна быть положительным числом.");
-                log.error("Invalid price value entered by user " + chatId);
-                return;
-            }
-            String quantityString = parts[2].trim();
-            Long quantity;
-            if (!quantityString.matches("\\d+")) {
-                sendMessage(chatId, "Ошибка при вводе количества. Пожалуйста, введите целое число.");
-                log.error("Invalid quantity format entered by user " + chatId);
-                return;
-            }
-            quantity = Long.parseLong(quantityString);
-            if (quantity <= 0) {
-                sendMessage(chatId, "Количество должно быть положительным числом.");
-                log.error("Invalid quantity value entered by user " + chatId);
-                return;
-            }
-            String productTypeString = parts[3].trim();
-            Long productType;
-            if (!productTypeString.matches("\\d+")) {
-                sendMessage(chatId, "Ошибка при вводе типа продукта. Пожалуйста, введите целое число.");
-                log.error("Invalid product type format entered by user " + chatId);
-                return;
-            }
-            productType = Long.parseLong(productTypeString);
-
-
-            // Создаем новый продукт и сохраняем его
-            Product product = new Product();
-            product.setProductName(productName);
-            product.setPrice(price);
-            product.setQuantity(quantity);
-            ProductCategory category = categoryRepo.findById(productType).orElse(null);
-            product.setCategory(category);
-            productRepo.save(product);
-
-            // Отправляем сообщение об успешном добавлении продукта
-            sendMessage(chatId, "Продукт " + productName + " в количестве " + quantity + " с ценой " + price + " успешно добавлен в базу ✅");
-            log.info("Product added to db by user " + chatId);
-        } else {
-            // Отправляем сообщение о неправильном формате ввода
-            sendMessage(chatId, "Пожалуйста, убедитесь, что вы ввели информацию о продукте в правильном формате.");
-            log.error("Product not added, incorrect input format by user " + chatId);
         }
     }
 
