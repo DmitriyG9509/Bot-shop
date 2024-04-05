@@ -497,7 +497,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             if (userDuty == 0) {
                 continue;
             }
-            sendMessage(user.getChatId(), "Привет! Ваш долг за вкусняшки на сегодня составляет: " + userDuty + ". Пожалуйста, занесите денюжку в бугалтерию. Хороших выходных!");
+            sendMessage(user.getChatId(), "Привет! Ваш долг за вкусняшки на сегодня составляет: " + userDuty + " Тг \uD83D\uDCB2" + ". Пожалуйста, занесите денюжку в бухгалтерию. Хороших выходных! \uD83D\uDE09");
             ;
         }
         for (ShopUser user : users) {
