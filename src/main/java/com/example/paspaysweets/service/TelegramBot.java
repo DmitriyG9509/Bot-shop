@@ -28,11 +28,13 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.sql.Timestamp;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -597,17 +599,43 @@ public class TelegramBot extends TelegramLongPollingBot {
         return keyboardMarkup;
     }
 
+    private Map<Long, Boolean> buttonStateMap = new ConcurrentHashMap<>();
+
     public void handleConfirmationCallback(Long chatId, String callbackData, int messageId) {
         String[] parts = callbackData.split("_");
-
-        if (parts.length == 3 && parts[0].equals("confirm") && StringUtils.isNumeric(parts[2])) {
-            handleConfirmPurchase(chatId, callbackData, messageId);
-        } else if (parts.length == 3 && parts[0].equals("cancel") && StringUtils.isNumeric(parts[2])) {
-            handleCancelPurchase(chatId, callbackData, messageId);
-        } else {
-            sendMessage(chatId, "Произошла непредвиденная ошибка.");
-            sendMessage(config.getBotOwners().get(0), "Не удалось обработать подтверждение покупки, ошибка.");
+        Boolean isPressed = buttonStateMap.getOrDefault(chatId, false);
+        if (!isPressed) {
+            if (parts.length == 3 && parts[0].equals("confirm") && StringUtils.isNumeric(parts[2])) {
+                buttonStateMap.put(chatId, true);
+                handleConfirmPurchase(chatId, callbackData, messageId);
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(1000); // Задержка в 2 секунды
+                        buttonStateMap.remove(chatId);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }).start();
+                return;
+            } else if (parts.length == 3 && parts[0].equals("cancel") && StringUtils.isNumeric(parts[2])) {
+                buttonStateMap.put(chatId, true);
+                handleCancelPurchase(chatId, callbackData, messageId);
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(1000); // Задержка в 2 секунды
+                        buttonStateMap.remove(chatId);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }).start();
+                return;
+            }
         }
+
+// Если кнопка уже была нажата или не выполнено ни одно из действий, отправляем сообщение об ошибке
+        sendMessage(chatId, "Произошла непредвиденная ошибка либо вы случайно нажали на подверждение покупки дважды");
+        sendMessage(config.getBotOwners()
+                          .get(0), "Не удалось обработать подтверждение покупки, ошибка." + chatId + buttonStateMap.toString());
     }
 
     private void tryDeleteMessage(Long chatId, Integer messageId) {
@@ -645,6 +673,15 @@ public class TelegramBot extends TelegramLongPollingBot {
                     userRepo.save(user);
                     sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
                     tryDeleteMessage(chatId, messageId);
+                }
+                String purchaceReport = product.getProductName() + "  " + product.getPrice() + "  " + user.getUsername() + "  " + user.getChatId();
+                String filePath = "/logs.txt";
+                try {
+                    FileWriter writer = new FileWriter(filePath, true);
+                    writer.write("\n" + purchaceReport);
+                    writer.close();    //TODO добавить отправку файла в S3
+                } catch (IOException e) {
+                    log.error("Ошибка при записи в файл: " + e.getMessage());
                 }
             } else {
                 sendMessage(chatId, "К сожалению, товар закончился.");
