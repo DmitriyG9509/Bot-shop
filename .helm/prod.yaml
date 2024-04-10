@@ -1,0 +1,46 @@
+replicaCount: 1
+
+rollingUpdate:
+  maxSurge: 1
+  maxUnavailable: 1
+
+
+
+imagePullSecrets:
+  - name: nexus-reg
+
+service:
+  type: NodePort
+  port: 8080
+  targetPort: 8080
+
+resources:
+  limits:
+    cpu: 350m
+    memory: 356Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+
+
+
+ingress:
+  enabled: true
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+  hosts:
+    - host: api.paspay.kz
+      paths:
+        - /
+  tls:
+    - secretName: paspay-tls
+      hosts:
+        - api.paspay.kz
+
+
+
+cronjobs: []
+
+persistence:
+  enabled: false
