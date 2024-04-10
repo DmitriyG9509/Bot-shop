@@ -1,4 +1,4 @@
 include:
   - project: 'Paspay/gitlab-ci'
     ref: master
-    file: '/helm-deploy.yml'
+    file: '/dev-test.yml'
