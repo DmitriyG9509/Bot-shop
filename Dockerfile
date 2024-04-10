@@ -3,7 +3,7 @@ FROM openjdk:17-jdk-slim
 EXPOSE 8080
 # install Spring Boot artifact
 VOLUME /tmp
-ADD target/PaspaySweets-0.0.1-SNAPSHOT.jar app.jar
+ADD target/sweet-bot-0.0.1-SNAPSHOT.jar app.jar
 RUN sh -c 'touch /app.jar'
 # сonfigure to Almaty timezone. I dislike debugging failures in UTC
 RUN unlink /etc/localtime && ln -s /usr/share/zoneinfo/Asia/Almaty /etc/localtime
