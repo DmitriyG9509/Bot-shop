@@ -11,6 +11,10 @@ import com.example.paspaysweets.repository.UserRepo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFCell;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,11 +32,14 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.io.FileWriter;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -674,14 +681,38 @@ public class TelegramBot extends TelegramLongPollingBot {
                     sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
                     tryDeleteMessage(chatId, messageId);
                 }
-                String purchaceReport = product.getProductName() + "  " + product.getPrice() + "  " + user.getUsername() + "  " + user.getChatId();
-                String filePath = "/logs.txt";
+                XSSFWorkbook workbook = null;
                 try {
-                    FileWriter writer = new FileWriter(filePath, true);
-                    writer.write("\n" + purchaceReport);
-                    writer.close();    //TODO добавить отправку файла в S3
+                    workbook = new XSSFWorkbook(new FileInputStream("src/main/resources/sells_log.xlsx"));
+
+                    XSSFSheet sheet = workbook.getSheet("sheet1");
+                    int rownum = findFirstEmptyRow(sheet);
+                    XSSFRow row = sheet.getRow(rownum);
+                    if (row == null) {
+                        row = sheet.createRow(rownum);
+                    }
+                    LocalDate currentDate = LocalDate.now();
+
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd"); // Укажите нужный вам формат даты
+                    String dateString = currentDate.format(formatter);
+                    String[] strings = {product.getProductName(), String.valueOf(product.getPrice()), user.getUsername(), dateString};
+                    for (int i = 0; i < strings.length; i++) {
+                        XSSFCell cell = row.createCell(i);
+                        cell.setCellValue(strings[i]);
+                    }
+                    try (FileOutputStream fos = new FileOutputStream("src/main/resources/sells_log.xlsx")) {
+                        workbook.write(fos);
+                    }
                 } catch (IOException e) {
-                    log.error("Ошибка при записи в файл: " + e.getMessage());
+                    throw new RuntimeException(e);
+                } finally {
+                    if (workbook != null) {
+                        try {
+                            workbook.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
                 }
             } else {
                 sendMessage(chatId, "К сожалению, товар закончился.");
@@ -690,6 +721,17 @@ public class TelegramBot extends TelegramLongPollingBot {
         } else {
             sendMessage(chatId, "Товар с указанным идентификатором не найден.");
         }
+    }
+
+    private int findFirstEmptyRow(XSSFSheet sheet) {
+        int rowCount = sheet.getLastRowNum() + 1;
+        for (int i = 0; i < rowCount; i++) {
+            XSSFRow row = sheet.getRow(i);
+            if (row == null) {
+                return i;
+            }
+        }
+        return rowCount;
     }
 
     private void handleCancelPurchase(Long chatId, String callbackData, int messageId) {
