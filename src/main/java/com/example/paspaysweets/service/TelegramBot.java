@@ -747,7 +747,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
         return rowCount;
     }
-    @Scheduled(cron = "0 11 13 * * THU")
+    @Scheduled(cron = "0 35 13 * * THU")
     public void sendWeeklyReport() {
         // Путь к файлу с отчетом
 
