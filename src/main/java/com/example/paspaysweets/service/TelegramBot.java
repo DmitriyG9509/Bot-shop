@@ -681,53 +681,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                     sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
                     tryDeleteMessage(chatId, messageId);
                 }
-                XSSFWorkbook workbook = null;
-                try {
-                    log.info("starting add info in report");
-                    workbook = new XSSFWorkbook(new FileInputStream("/resources/sells_log.xlsx"));
-
-                    XSSFSheet sheet = workbook.getSheet("sheet1");
-                    int rownum = findFirstEmptyRow(sheet);
-                    XSSFRow row = sheet.getRow(rownum);
-                    if (row == null) {
-                        row = sheet.createRow(rownum);
-                    }
-                    LocalDate currentDate = LocalDate.now();
-
-                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd"); // Укажите нужный вам формат даты
-                    String dateString = currentDate.format(formatter);
-                    String[] strings = {product.getProductName(), String.valueOf(product.getPrice()), user.getUsername(), dateString};
-                    for (int i = 0; i < strings.length; i++) {
-                        XSSFCell cell = row.createCell(i);
-                        cell.setCellValue(strings[i]);
-                    }
-                    log.info("adding data in report");
-                    try (FileOutputStream fos = new FileOutputStream("/resources/sells_log.xlsx")) {
-                        workbook.write(fos);
-                        log.info("Data added to the report");
-                    }
-                    StringBuilder message = new StringBuilder();
-                    XSSFSheet sheet11 = workbook.getSheetAt(0); // Предполагается, что данные находятся на первом листе
-                    for (Row row111 : sheet11) {
-                        for (Cell cell : row111) {
-                            message.append(cell.toString()).append(" "); // Добавление значения ячейки к сообщению
-                        }
-                        message.append("\n"); // Добавление переноса строки между строками
-
-                    }
-                    sendMessage(chatId, message.toString());
-                } catch (IOException e) {
-                    log.error("error while adding data in report");
-                    throw new RuntimeException(e);
-                } finally {
-                    if (workbook != null) {
-                        try {
-                            workbook.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
             } else {
                 sendMessage(chatId, "К сожалению, товар закончился.");
                 return;
