@@ -747,37 +747,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
         return rowCount;
     }
-    @Scheduled(cron = "0 35 13 * * THU")
-    public void sendWeeklyReport() {
-        // Путь к файлу с отчетом
 
-        String filePath = "/resources/sells_log.xlsx";
-        sendMessage(config.getBotOwners().get(0), "2");
-        // Прочитать файл в виде байтов
-        byte[] fileBytes;
-        sendMessage(config.getBotOwners().get(0), "3");
-        try (InputStream inputStream = new FileInputStream(filePath)) {
-            sendMessage(config.getBotOwners().get(0), "4");
-            fileBytes = IOUtils.toByteArray(inputStream);
-        } catch (Exception e) {
-            sendMessage(config.getBotOwners().get(0), e.getMessage());
-            throw new RuntimeException("Ошибка чтения файла", e);
-        }
-sendMessage(config.getBotOwners().get(0), "1");
-        // Отправить файл через Telegram
-        sendDocument(config.getBotOwners().get(0), fileBytes, "weekly_report.xlsx");
-    }
-    public void sendDocument(Long chatId, byte[] fileBytes, String fileName) {
-        SendDocument sendDocument = new SendDocument();
-        sendDocument.setChatId(chatId);
-        sendDocument.setDocument(new InputFile(new ByteArrayInputStream(fileBytes), fileName));
-        try {
-            execute(sendDocument);
-        } catch (TelegramApiException e) {
-            sendMessage(config.getBotOwners().get(0), "ошибка при еженедельной отправке документа о покупках");
-            e.printStackTrace();
-        }
-    }
     private void handleCancelPurchase(Long chatId, String callbackData, int messageId) {
         Long productId = Long.parseLong(callbackData.split("_")[2]);
         sendMessage(chatId, "Вы отменили покупку товара ❌");
