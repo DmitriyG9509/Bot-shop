@@ -7,9 +7,9 @@ bot:
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:5432/sweets?prepareTreshold=0
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://192.168.8.206:5432/sweets?prepareTreshold=0
+    username: paspay_sweet_bot
+    password: A2!@!d3d32@
   jpa:
     generate-ddl: false
     hibernate:
