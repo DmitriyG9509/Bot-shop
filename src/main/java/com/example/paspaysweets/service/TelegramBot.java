@@ -704,7 +704,18 @@ public class TelegramBot extends TelegramLongPollingBot {
                     log.info("adding data in report");
                     try (FileOutputStream fos = new FileOutputStream("/resources/sells_log.xlsx")) {
                         workbook.write(fos);
+                        log.info("Data added to the report");
                     }
+                    StringBuilder message = new StringBuilder();
+                    XSSFSheet sheet11 = workbook.getSheetAt(0); // Предполагается, что данные находятся на первом листе
+                    for (Row row111 : sheet11) {
+                        for (Cell cell : row111) {
+                            message.append(cell.toString()).append(" "); // Добавление значения ячейки к сообщению
+                        }
+                        message.append("\n"); // Добавление переноса строки между строками
+
+                    }
+                    sendMessage(chatId, message.toString());
                 } catch (IOException e) {
                     log.error("error while adding data in report");
                     throw new RuntimeException(e);
