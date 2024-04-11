@@ -9,6 +9,7 @@ import com.example.paspaysweets.repository.ProductRepo;
 import com.example.paspaysweets.repository.UserNamesRepo;
 import com.example.paspaysweets.repository.UserRepo;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFCell;
@@ -21,9 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
+import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.*;
+import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -32,10 +35,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URL;
 import java.sql.Timestamp;
 import java.time.LocalDate;
@@ -747,7 +747,33 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
         return rowCount;
     }
+    @Scheduled(cron = "0 0 12 * * THU")
+    public void sendWeeklyReport() {
+        // Путь к файлу с отчетом
+        String filePath = "/resources/sells_log.xlsx";
 
+        // Прочитать файл в виде байтов
+        byte[] fileBytes;
+        try (InputStream inputStream = new FileInputStream(filePath)) {
+            fileBytes = IOUtils.toByteArray(inputStream);
+        } catch (IOException e) {
+            throw new RuntimeException("Ошибка чтения файла", e);
+        }
+
+        // Отправить файл через Telegram
+        sendDocument(config.getBotOwners().get(0), fileBytes, "weekly_report.xlsx");
+    }
+    public void sendDocument(Long chatId, byte[] fileBytes, String fileName) {
+        SendDocument sendDocument = new SendDocument();
+        sendDocument.setChatId(chatId);
+        sendDocument.setDocument(new InputFile(new ByteArrayInputStream(fileBytes), fileName));
+        try {
+            execute(sendDocument);
+        } catch (TelegramApiException e) {
+            sendMessage(config.getBotOwners().get(0), "ошибка при еженедельной отправке документа о покупках");
+            e.printStackTrace();
+        }
+    }
     private void handleCancelPurchase(Long chatId, String callbackData, int messageId) {
         Long productId = Long.parseLong(callbackData.split("_")[2]);
         sendMessage(chatId, "Вы отменили покупку товара ❌");
