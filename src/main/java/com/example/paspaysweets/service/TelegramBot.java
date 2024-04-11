@@ -683,7 +683,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 }
                 XSSFWorkbook workbook = null;
                 try {
-                    workbook = new XSSFWorkbook(new FileInputStream("src/main/resources/sells_log.xlsx"));
+                    workbook = new XSSFWorkbook(new FileInputStream("/resources/sells_log.xlsx"));
 
                     XSSFSheet sheet = workbook.getSheet("sheet1");
                     int rownum = findFirstEmptyRow(sheet);
@@ -700,7 +700,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         XSSFCell cell = row.createCell(i);
                         cell.setCellValue(strings[i]);
                     }
-                    try (FileOutputStream fos = new FileOutputStream("src/main/resources/sells_log.xlsx")) {
+                    try (FileOutputStream fos = new FileOutputStream("/resources/sells_log.xlsx")) {
                         workbook.write(fos);
                     }
                 } catch (IOException e) {
