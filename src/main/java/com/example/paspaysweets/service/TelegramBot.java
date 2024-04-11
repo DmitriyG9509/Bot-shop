@@ -747,19 +747,23 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
         return rowCount;
     }
-    @Scheduled(cron = "0 53 12 * * THU")
+    @Scheduled(cron = "0 11 13 * * THU")
     public void sendWeeklyReport() {
         // Путь к файлу с отчетом
-        String filePath = "/resources/sells_log.xlsx";
 
+        String filePath = "/resources/sells_log.xlsx";
+        sendMessage(config.getBotOwners().get(0), "2");
         // Прочитать файл в виде байтов
         byte[] fileBytes;
+        sendMessage(config.getBotOwners().get(0), "3");
         try (InputStream inputStream = new FileInputStream(filePath)) {
+            sendMessage(config.getBotOwners().get(0), "4");
             fileBytes = IOUtils.toByteArray(inputStream);
-        } catch (IOException e) {
+        } catch (Exception e) {
+            sendMessage(config.getBotOwners().get(0), e.getMessage());
             throw new RuntimeException("Ошибка чтения файла", e);
         }
-
+sendMessage(config.getBotOwners().get(0), "1");
         // Отправить файл через Telegram
         sendDocument(config.getBotOwners().get(0), fileBytes, "weekly_report.xlsx");
     }
