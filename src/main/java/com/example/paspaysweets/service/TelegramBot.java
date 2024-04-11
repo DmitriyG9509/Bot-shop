@@ -683,6 +683,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 }
                 XSSFWorkbook workbook = null;
                 try {
+                    log.info("starting add info in report");
                     workbook = new XSSFWorkbook(new FileInputStream("/resources/sells_log.xlsx"));
 
                     XSSFSheet sheet = workbook.getSheet("sheet1");
@@ -700,10 +701,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                         XSSFCell cell = row.createCell(i);
                         cell.setCellValue(strings[i]);
                     }
+                    log.info("adding data in report");
                     try (FileOutputStream fos = new FileOutputStream("/resources/sells_log.xlsx")) {
                         workbook.write(fos);
                     }
                 } catch (IOException e) {
+                    log.error("error while adding data in report");
                     throw new RuntimeException(e);
                 } finally {
                     if (workbook != null) {
