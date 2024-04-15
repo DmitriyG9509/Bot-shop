@@ -9,24 +9,19 @@ import com.example.paspaysweets.repository.ProductRepo;
 import com.example.paspaysweets.repository.UserNamesRepo;
 import com.example.paspaysweets.repository.UserRepo;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.compress.utils.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFCell;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
-import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.*;
-import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -35,11 +30,10 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.sql.Timestamp;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -50,6 +44,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private final String NOT_REGISTERED = "Для взаимодействия с ботом пожалуйста зарегистрируйтесь(введите команду /register или в меню нажмите на эту же кнопку). Напоминаю, регистрацию могут пройти только сотрудники Paspay работающие из офиса";
     private final String INFO_TEXT = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ, по нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ" + " Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. ";
+    private final String LINK_MEET = "https://meet.google.com/tao-ogcr-oxd";
 
     private final String INFO_TEXT_ADMIN = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ." + " По нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ\"" + "Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. " + "\n➡\uFE0F Описание кнопок, которые доступны только админам: \n\uD83D\uDFE2 список продуктов  --  выводит список продуктов для покупки" + "\n\uD83D\uDFE2 добавить продукт  --  после нажатия кнопки боту нужно отправить файл в формате excel. Пожалуйста заполняйте только в определенном формате. За инструкцией обратитесь к Дмитрию" + "\n\uD83D\uDFE2 отправить сообщение всем  --  после нажатия кнопки бот попросит отправить ему нужное сообщение для рассылки." + "\n\uD83D\uDFE2 удалить пользователя  --  после нажатия кнопки нужно ввести имя пользователя, userName из телеграм. Получить имя можно например кнопкой ПРОВЕРКА БАЛАНСА ПОЛЬЗОВАТЕЛЕЙ." + "\n\uD83D\uDFE2  сброс всех продуктов  --  Производится сброс всех продуктов из базы данных. ВНИМАНИЕ! продукты и данные о них будут удалены безвозвратно! Для подтверждения действия нужно будет ввести на клавиатуре слово \"да\"" + "\n\uD83D\uDFE2 проверка долгов пользователей  --  в ответ отдает таблицу всех пользователей с их задолженностями" + "\n\uD83D\uDFE2 проверка баланса пользователей  --  отдает таблицу с балансом всех пользователей(кошелек, если кто-то например положил деньги заранее)" + "\n\uD83D\uDFE2 пополнение баланса пользователя  --  в ответ боту нужно ввести сообщение в виде chatId&сумма пополнения(84857584&400). Таблицу с chatId будет у вас в распечатанном виде, так же можно посмотреть его с помощью кнопки БАЛАНС ПОЛЬЗОВАТЕЛЕЙ" + "\n\uD83D\uDFE2 список продуктов  --  выдает список продуктов, которые есть в магазине в формате название-цена-количество";
     private final ProductRepo productRepo;
@@ -497,7 +492,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    @Scheduled(cron = "0 0 17 * * FRI")
+    @Scheduled(cron = "0 0 17 * * FRI", zone = "GMT+05:00")
     public void sendFridayMessage() {
         var users = userRepo.findAll();
 
@@ -518,6 +513,15 @@ public class TelegramBot extends TelegramLongPollingBot {
                 sendMessage(config.getBotOwners()
                                   .get(i), "Пользователь " + userName + " (chatId: " + chatId + ") имеет задолженность: " + duty);
             }
+        }
+
+    }
+
+    @Scheduled(cron = "0 20 9 * * MON-FRI", zone = "GMT+05:00")
+    public void sendMeetingLink() {
+        List<Long> list = new ArrayList<>(Arrays.asList(1631579869L, 626332730L, 507062102L, 282572312L));
+        for (int i = 0; i < list.size(); i++) {
+            sendMessage(list.get(i), LINK_MEET + "\n" + "Доброе утро! Подключаемся к миту в 09:30.");
         }
 
     }
@@ -674,12 +678,16 @@ public class TelegramBot extends TelegramLongPollingBot {
                     userRepo.save(user);
                     sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
                     tryDeleteMessage(chatId, messageId);
+                    String report = user.getUsername() + " - " + product.getProductName() + " - " + String.valueOf(product.getPrice());
+                    sendMessage(config.getBotOwners().get(0), report);
                 } else {
                     user.setDuty((-(count)) + user.getDuty());
                     user.setCash(0L);
                     userRepo.save(user);
                     sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
                     tryDeleteMessage(chatId, messageId);
+                    String report = user.getUsername() + " " + product.getProductName() + " " + String.valueOf(product.getPrice());
+                    sendMessage(config.getBotOwners().get(0), report);
                 }
             } else {
                 sendMessage(chatId, "К сожалению, товар закончился.");
