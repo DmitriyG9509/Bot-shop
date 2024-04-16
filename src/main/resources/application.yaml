@@ -3,6 +3,7 @@ bot:
   token: 6835294052:AAEu9llAyx5wzaDpZlt88PQ4MjCkQoCBmSs
   owner:
     1: 1631579869
+    2: 5134470151
 
 spring:
   datasource:

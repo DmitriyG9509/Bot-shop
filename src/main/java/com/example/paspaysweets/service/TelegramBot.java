@@ -492,7 +492,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    @Scheduled(cron = "0 0 17 * * FRI", zone = "GMT+05:00")
+    @Scheduled(cron = "0 0 16 * * FRI", zone = "GMT+05:00")
     public void sendFridayMessage() {
         var users = userRepo.findAll();
 
@@ -517,7 +517,7 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     }
 
-    @Scheduled(cron = "0 20 9 * * MON-FRI", zone = "GMT+05:00")
+    @Scheduled(cron = "0 24 9 * * MON-FRI", zone = "GMT+05:00")
     public void sendMeetingLink() {
         List<Long> list = new ArrayList<>(Arrays.asList(1631579869L, 626332730L, 507062102L, 282572312L, 1658439256L));
         for (int i = 0; i < list.size(); i++) {
