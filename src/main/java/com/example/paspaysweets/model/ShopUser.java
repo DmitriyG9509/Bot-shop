@@ -25,6 +25,9 @@ public class ShopUser {
     @Column(name = "user_name")
     private String userName;
 
+    @Column(name = "fio")
+    private String fio;
+
     @Column(name = "registered_at")
     private Timestamp registeredAt;
 
