@@ -22,6 +22,7 @@ import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.*;
+import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -30,10 +31,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
@@ -667,7 +665,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void handleConfirmPurchase(Long chatId, String callbackData, int messageId) {
-        var todayDate = LocalDateTime.now().toString();
+        var todayDate = LocalDate.now().toString();
         Long productId = Long.parseLong(callbackData.split("_")[2]);
         Optional<Product> optionalProductBase = productRepo.findById(productId);
         Optional<ShopUser> optionalShopUser = userRepo.findByChatId(chatId);
@@ -688,12 +686,17 @@ public class TelegramBot extends TelegramLongPollingBot {
                     String report = user.getUsername() + " - " + product.getProductName() + " - " + product.getPrice() + " - " + todayDate + "\n";
                     sendMessage(config.getBotOwners().get(0), report);
                     FileOutputStream fileOut = null;
-                    try {
-                        fileOut = new FileOutputStream("resources/templates/report.txt");
-                        fileOut.write(report.getBytes(StandardCharsets.UTF_8));
-                        fileOut.close();
-                    } catch (IOException e) {
-                       sendMessage(config.getBotOwners().get(0), e.getMessage() + "  " + "покупка не записана в файл");
+//                    try {
+//                        fileOut = new FileOutputStream("resources/templates/report.txt");
+//                        fileOut.write(report.getBytes(StandardCharsets.UTF_8));
+//                        fileOut.close();
+//                    } catch (IOException e) {
+//                       sendMessage(config.getBotOwners().get(0), e.getMessage() + "  " + "покупка не записана в файл");
+//                    }
+                    try (PrintWriter out = new PrintWriter("report.txt")) {
+                        out.println(report);
+                    } catch (FileNotFoundException e) {
+                        sendMessage(config.getBotOwners().get(0), e.getMessage() + "  " + "покупка не записана в файл");
                     }
                 } else {
                     user.setDuty((-(count)) + user.getDuty());
