@@ -683,19 +683,13 @@ public class TelegramBot extends TelegramLongPollingBot {
                     userRepo.save(user);
                     sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
                     tryDeleteMessage(chatId, messageId);
-                    String report = user.getUsername() + " - " + product.getProductName() + " - " + product.getPrice() + " - " + todayDate + "\n";
+                    String report = user.getUsername() + " - " + product.getProductName() + " - " + product.getPrice() + " - " + todayDate;
                     sendMessage(config.getBotOwners().get(0), report);
                     FileOutputStream fileOut = null;
-//                    try {
-//                        fileOut = new FileOutputStream("resources/templates/report.txt");
-//                        fileOut.write(report.getBytes(StandardCharsets.UTF_8));
-//                        fileOut.close();
-//                    } catch (IOException e) {
-//                       sendMessage(config.getBotOwners().get(0), e.getMessage() + "  " + "покупка не записана в файл");
-//                    }
-                    try (PrintWriter out = new PrintWriter("report.txt")) {
+//
+                    try (PrintWriter out = new PrintWriter(new FileWriter("resources/report.txt", true))) {
                         out.println(report);
-                    } catch (FileNotFoundException e) {
+                    } catch (IOException e) {
                         sendMessage(config.getBotOwners().get(0), e.getMessage() + "  " + "покупка не записана в файл");
                     }
                 } else {
@@ -704,8 +698,13 @@ public class TelegramBot extends TelegramLongPollingBot {
                     userRepo.save(user);
                     sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
                     tryDeleteMessage(chatId, messageId);
-                    String report = user.getUsername() + " " + product.getProductName() + " " + String.valueOf(product.getPrice());
+                    String report = user.getUsername() + " - " + product.getProductName() + " - " + product.getPrice() + " - " + todayDate;
                     sendMessage(config.getBotOwners().get(0), report);
+                    try (PrintWriter out = new PrintWriter(new FileWriter("resources/report.txt", true))) {
+                        out.println(report);
+                    } catch (IOException e) {
+                        sendMessage(config.getBotOwners().get(0), e.getMessage() + "  " + "покупка не записана в файл");
+                    }
                 }
             } else {
                 sendMessage(chatId, "К сожалению, товар закончился.");
