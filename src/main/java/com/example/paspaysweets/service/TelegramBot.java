@@ -30,10 +30,15 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -520,7 +525,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Scheduled(cron = "0 24 9 * * MON-FRI", zone = "GMT+05:00")
     public void sendMeetingLink() {
         List<Long> list = new ArrayList<>(Arrays.asList(1631579869L, 626332730L, 507062102L, 282572312L, 1658439256L,
-                772963240L));
+                772963240L, 1606172234L));
         for (int i = 0; i < list.size(); i++) {
             sendMessage(list.get(i), LINK_MEET + "\n" + "Доброе утро! Подключаемся к миту в 09:30.");
         }
@@ -662,6 +667,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void handleConfirmPurchase(Long chatId, String callbackData, int messageId) {
+        var todayDate = LocalDateTime.now().toString();
         Long productId = Long.parseLong(callbackData.split("_")[2]);
         Optional<Product> optionalProductBase = productRepo.findById(productId);
         Optional<ShopUser> optionalShopUser = userRepo.findByChatId(chatId);
@@ -679,8 +685,16 @@ public class TelegramBot extends TelegramLongPollingBot {
                     userRepo.save(user);
                     sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
                     tryDeleteMessage(chatId, messageId);
-                    String report = user.getUsername() + " - " + product.getProductName() + " - " + String.valueOf(product.getPrice());
+                    String report = user.getUsername() + " - " + product.getProductName() + " - " + product.getPrice() + " - " + todayDate + "\n";
                     sendMessage(config.getBotOwners().get(0), report);
+                    FileOutputStream fileOut = null;
+                    try {
+                        fileOut = new FileOutputStream("resources/templates/report.txt");
+                        fileOut.write(report.getBytes(StandardCharsets.UTF_8));
+                        fileOut.close();
+                    } catch (IOException e) {
+                       sendMessage(config.getBotOwners().get(0), e.getMessage() + "  " + "покупка не записана в файл");
+                    }
                 } else {
                     user.setDuty((-(count)) + user.getDuty());
                     user.setCash(0L);
