@@ -335,13 +335,15 @@ public class TelegramBot extends TelegramLongPollingBot {
             StringBuilder dutyInfo = new StringBuilder("Долги пользователей:\n");
 
             for (ShopUser user : users) {
-                dutyInfo.append(user.getFio())
-                        .append("   ")
-                        .append(user.getDuty())
-                        .append("ТГ")
-                        .append("   ")
-                        .append(user.getChatId())
-                        .append("\n");
+                if (user.getDuty() != 0) {
+                    dutyInfo.append(user.getFio())
+                            .append("   ")
+                            .append(user.getDuty())
+                            .append("ТГ")
+                            .append("   ")
+                            .append(user.getChatId())
+                            .append("\n");
+                }
             }
 
             sendMessage(update.getMessage().getChatId(), dutyInfo.toString());
@@ -503,29 +505,16 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Scheduled(cron = "0 0 16 * * FRI", zone = "GMT+05:00")
     public void sendFridayMessage() {
         var users = userRepo.findAll();
-
         for (ShopUser user : users) {
             var userDuty = user.getDuty();
             if (userDuty == 0) {
                 continue;
             }
             sendMessage(user.getChatId(), "Привет! Ваш долг за вкусняшки на сегодня составляет: " + userDuty + " Тг \uD83D\uDCB2" + ". Пожалуйста, занесите денюжку в бухгалтерию. Хороших выходных! \uD83D\uDE09");
-            ;
         }
-        for (ShopUser user : users) {
-            var duty = user.getDuty();
-            long chatId = user.getChatId();
-            String userName = user.getFio();
-
-            for (int i = 0; i < config.getBotOwners().toArray().length; i++) {
-                sendMessage(config.getBotOwners()
-                                  .get(i), "Пользователь " + userName + " (chatId: " + chatId + ") имеет задолженность: " + duty);
-            }
-        }
-
     }
 
-    @Scheduled(cron = "0 24 9 * * MON-FRI", zone = "GMT+05:00")
+    @Scheduled(cron = "0 25 9 * * MON-FRI", zone = "GMT+05:00")
     public void sendMeetingLink() {
         List<Long> list = new ArrayList<>(Arrays.asList(1631579869L, 626332730L, 507062102L, 282572312L, 1658439256L,
                 772963240L, 1606172234L));
