@@ -552,18 +552,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         } else {
             sendMessage(chatId, "Ошибка обработки callback'а.");
         }
-        callbackAnswer(chatId);
-    }
-
-    private void callbackAnswer(Long chatId) {
-        AnswerCallbackQuery answer = new AnswerCallbackQuery();
-        answer.setCallbackQueryId(chatId.toString()); // Используем идентификатор чата
-        try {
-            execute(answer);
-        } catch (TelegramApiException e) {
-            sendMessage(config.getBotOwners()
-                              .get(0), "Ошибка ответа коллбэка(отмена мигания кнопки) в методе handleCategoryCallback" + e.getMessage());
-        }
     }
 
     private InlineKeyboardMarkup createProductTable(List<Product> products) {
@@ -605,7 +593,6 @@ public class TelegramBot extends TelegramLongPollingBot {
                 // Отправляем сообщение с вопросом о подтверждении покупки
                 InlineKeyboardMarkup keyboardMarkup = createConfirmationKeyboard(productId);
                 sendMessageWithInlineKeyboard(chatId, "Хотите приобрести товар?", keyboardMarkup);
-                callbackAnswer(chatId);
             } else {
                 sendMessage(chatId, "Товар с указанным идентификатором не найден.");
             }
@@ -669,7 +656,6 @@ public class TelegramBot extends TelegramLongPollingBot {
         sendMessage(chatId, "Произошла непредвиденная ошибка либо вы случайно нажали на подверждение покупки дважды");
         sendMessage(config.getBotOwners()
                           .get(0), "Не удалось обработать подтверждение покупки, ошибка." + chatId + buttonStateMap.toString());
-        callbackAnswer(chatId);
     }
 
     private void tryDeleteMessage(Long chatId, Integer messageId) {
