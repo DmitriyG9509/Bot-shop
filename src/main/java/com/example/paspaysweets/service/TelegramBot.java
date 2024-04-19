@@ -11,18 +11,16 @@ import com.example.paspaysweets.repository.UserRepo;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
-import org.apache.poi.xssf.usermodel.XSSFRow;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.*;
-import org.telegram.telegrambots.meta.api.objects.File;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
@@ -31,12 +29,13 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.io.*;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintWriter;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -126,6 +125,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                                 log.info(chatId + " requested info");
                             }
                             case "Список продуктов \uD83D\uDCDD" -> sendProductCategories(chatId);
+                            case "Мой баланс и задолженность \uD83D\uDEE1\uFE0F" -> sendUserDutyAndBalance(chatId);
                             case "Отправить сообщение всем \uD83D\uDCE9" -> sendMessageToAll(update);
                             case "Добавить продукт ➕" -> requestProductInfo(chatId);
                             case "Удалить пользователя \uD83D\uDDD1\uFE0F" -> requestUserNameToDelete(chatId);
@@ -167,6 +167,11 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
         }
         return false;
+    }
+
+    public void sendUserDutyAndBalance(Long chatId) {
+        var userEntity = userRepo.findByChatId(chatId).get();
+        sendMessage(chatId, "Ваш баланс составляет - " + userEntity.getCash() + ".\n" + "Ваш долг составляет - " + userEntity.getDuty());
     }
 
     @Transactional(rollbackFor = IllegalArgumentException.class)
@@ -330,7 +335,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             StringBuilder dutyInfo = new StringBuilder("Долги пользователей:\n");
 
             for (ShopUser user : users) {
-                dutyInfo.append(user.getUsername())
+                dutyInfo.append(user.getFio())
                         .append("   ")
                         .append(user.getDuty())
                         .append("ТГ")
@@ -352,7 +357,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             StringBuilder dutyInfo = new StringBuilder("Баланс пользователей:\n");
 
             for (ShopUser user : users) {
-                dutyInfo.append(user.getUsername())
+                dutyInfo.append(user.getFio())
                         .append("   ")
                         .append(user.getCash())
                         .append("ТГ")
@@ -510,7 +515,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         for (ShopUser user : users) {
             var duty = user.getDuty();
             long chatId = user.getChatId();
-            String userName = user.getUsername();
+            String userName = user.getFio();
 
             for (int i = 0; i < config.getBotOwners().toArray().length; i++) {
                 sendMessage(config.getBotOwners()
@@ -546,6 +551,18 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
         } else {
             sendMessage(chatId, "Ошибка обработки callback'а.");
+        }
+        callbackAnswer(chatId);
+    }
+
+    private void callbackAnswer(Long chatId) {
+        AnswerCallbackQuery answer = new AnswerCallbackQuery();
+        answer.setCallbackQueryId(chatId.toString()); // Используем идентификатор чата
+        try {
+            execute(answer);
+        } catch (TelegramApiException e) {
+            sendMessage(config.getBotOwners()
+                              .get(0), "Ошибка ответа коллбэка(отмена мигания кнопки) в методе handleCategoryCallback" + e.getMessage());
         }
     }
 
@@ -588,6 +605,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                 // Отправляем сообщение с вопросом о подтверждении покупки
                 InlineKeyboardMarkup keyboardMarkup = createConfirmationKeyboard(productId);
                 sendMessageWithInlineKeyboard(chatId, "Хотите приобрести товар?", keyboardMarkup);
+                callbackAnswer(chatId);
             } else {
                 sendMessage(chatId, "Товар с указанным идентификатором не найден.");
             }
@@ -651,6 +669,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         sendMessage(chatId, "Произошла непредвиденная ошибка либо вы случайно нажали на подверждение покупки дважды");
         sendMessage(config.getBotOwners()
                           .get(0), "Не удалось обработать подтверждение покупки, ошибка." + chatId + buttonStateMap.toString());
+        callbackAnswer(chatId);
     }
 
     private void tryDeleteMessage(Long chatId, Integer messageId) {
@@ -665,7 +684,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void handleConfirmPurchase(Long chatId, String callbackData, int messageId) {
-        var todayDate = LocalDate.now().toString();
+
         Long productId = Long.parseLong(callbackData.split("_")[2]);
         Optional<Product> optionalProductBase = productRepo.findById(productId);
         Optional<ShopUser> optionalShopUser = userRepo.findByChatId(chatId);
@@ -681,30 +700,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                 if (count >= 0) {
                     user.setCash(count);
                     userRepo.save(user);
-                    sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
-                    tryDeleteMessage(chatId, messageId);
-                    String report = user.getUsername() + " - " + product.getProductName() + " - " + product.getPrice() + " - " + todayDate;
-                    sendMessage(config.getBotOwners().get(0), report);
-                    FileOutputStream fileOut = null;
-//
-                    try (PrintWriter out = new PrintWriter(new FileWriter("resources/report.txt", true))) {
-                        out.println(report);
-                    } catch (IOException e) {
-                        sendMessage(config.getBotOwners().get(0), e.getMessage() + "  " + "покупка не записана в файл");
-                    }
+                    sendResponseAndDocument(user, product, chatId, messageId);
                 } else {
                     user.setDuty((-(count)) + user.getDuty());
                     user.setCash(0L);
                     userRepo.save(user);
-                    sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
-                    tryDeleteMessage(chatId, messageId);
-                    String report = user.getUsername() + " - " + product.getProductName() + " - " + product.getPrice() + " - " + todayDate;
-                    sendMessage(config.getBotOwners().get(0), report);
-                    try (PrintWriter out = new PrintWriter(new FileWriter("resources/report.txt", true))) {
-                        out.println(report);
-                    } catch (IOException e) {
-                        sendMessage(config.getBotOwners().get(0), e.getMessage() + "  " + "покупка не записана в файл");
-                    }
+                    sendResponseAndDocument(user, product, chatId, messageId);
                 }
             } else {
                 sendMessage(chatId, "К сожалению, товар закончился.");
@@ -715,15 +716,17 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private int findFirstEmptyRow(XSSFSheet sheet) {
-        int rowCount = sheet.getLastRowNum() + 1;
-        for (int i = 0; i < rowCount; i++) {
-            XSSFRow row = sheet.getRow(i);
-            if (row == null) {
-                return i;
-            }
+    private void sendResponseAndDocument(ShopUser user, Product product, Long chatId, int messageId) {
+        var todayDate = LocalDate.now().toString();
+        sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
+        tryDeleteMessage(chatId, messageId);
+        String report = user.getFio() + " - " + product.getProductName() + " - " + product.getPrice() + " - " + todayDate;
+        sendMessage(config.getBotOwners().get(0), report);
+        try (PrintWriter out = new PrintWriter(new FileWriter("resources/report.txt", true))) {
+            out.println(report);
+        } catch (IOException e) {
+            sendMessage(config.getBotOwners().get(0), e.getMessage() + "  " + "покупка не записана в файл");
         }
-        return rowCount;
     }
 
     private void handleCancelPurchase(Long chatId, String callbackData, int messageId) {
@@ -851,38 +854,42 @@ public class TelegramBot extends TelegramLongPollingBot {
         row1.add("  Список продуктов \uD83D\uDCDD  ");
         keyboardRows.add(row1);
 
-        if (isChatIdBotOwner(config.getBotOwners(), chatId)) {
-            KeyboardRow row2 = new KeyboardRow();
-            row2.add("  Добавить продукт ➕  ");
-            keyboardRows.add(row2);
+        KeyboardRow row2 = new KeyboardRow();
+        row2.add("  Мой баланс и задолженность \uD83D\uDEE1\uFE0F  ");
+        keyboardRows.add(row2);
 
+        if (isChatIdBotOwner(config.getBotOwners(), chatId)) {
             KeyboardRow row3 = new KeyboardRow();
-            row3.add("  Отправить сообщение всем \uD83D\uDCE9  ");
+            row3.add("  Добавить продукт ➕  ");
             keyboardRows.add(row3);
 
             KeyboardRow row4 = new KeyboardRow();
-            row4.add("  Удалить пользователя \uD83D\uDDD1\uFE0F  ");
+            row4.add("  Отправить сообщение всем \uD83D\uDCE9  ");
             keyboardRows.add(row4);
 
             KeyboardRow row5 = new KeyboardRow();
-            row5.add("  Сброс всех продуктов ❌  ");
+            row5.add("  Удалить пользователя \uD83D\uDDD1\uFE0F  ");
             keyboardRows.add(row5);
 
             KeyboardRow row6 = new KeyboardRow();
-            row6.add("  Проверка долгов пользователей \uD83D\uDC6E  ");
+            row6.add("  Сброс всех продуктов ❌  ");
             keyboardRows.add(row6);
 
             KeyboardRow row7 = new KeyboardRow();
-            row6.add("  Проверка баланса пользователей \uD83D\uDCB2  ");
+            row7.add("  Проверка долгов пользователей \uD83D\uDC6E  ");
             keyboardRows.add(row7);
 
             KeyboardRow row8 = new KeyboardRow();
-            row7.add("  Пополнение баланса пользователя \uD83D\uDCB0  ");
+            row8.add("  Проверка баланса пользователей \uD83D\uDCB2  ");
             keyboardRows.add(row8);
 
             KeyboardRow row9 = new KeyboardRow();
-            row8.add("  Список оставшихся продуктов \uD83E\uDDFE  ");
+            row9.add("  Пополнение баланса пользователя \uD83D\uDCB0  ");
             keyboardRows.add(row9);
+
+            KeyboardRow row10 = new KeyboardRow();
+            row10.add("  Список оставшихся продуктов \uD83E\uDDFE  ");
+            keyboardRows.add(row10);
         }
         keyboardMarkup.setKeyboard(keyboardRows);
         message.setReplyMarkup(keyboardMarkup);
