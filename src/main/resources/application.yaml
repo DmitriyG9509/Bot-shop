@@ -21,3 +21,17 @@ spring:
       hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
   flyway:
     enabled: true
+aws:
+  s3:
+    bucket: paspay-test
+  upload-file:
+    format: .xlsx
+s3:
+  url: https://paspay-test.archive.pscloud.io/report.txt
+grpc:
+  client:
+    fileworker-grpc-server: # change to paspay-fileworker ip address
+      address: static://192.168.8.184:30121
+      enableKeepAlive: true
+      keepAliveWithoutCalls: true
+      negotiationType: plaintext
