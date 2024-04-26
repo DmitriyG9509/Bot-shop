@@ -538,7 +538,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    @Scheduled(cron = "0 0 16 * * FRI", zone = "GMT+05:00")
+    @Scheduled(cron = "0 11 17 * * FRI", zone = "GMT+05:00")
     public void sendFridayMessage() {
         var users = userRepo.findAll();
         for (ShopUser user : users) {
