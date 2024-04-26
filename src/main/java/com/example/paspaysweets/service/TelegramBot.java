@@ -4,10 +4,8 @@ import com.example.paspaysweets.config.BotConfig;
 import com.example.paspaysweets.model.Product;
 import com.example.paspaysweets.model.ProductCategory;
 import com.example.paspaysweets.model.ShopUser;
-import com.example.paspaysweets.repository.CategoryRepo;
-import com.example.paspaysweets.repository.ProductRepo;
-import com.example.paspaysweets.repository.UserNamesRepo;
-import com.example.paspaysweets.repository.UserRepo;
+import com.example.paspaysweets.model.Transactions;
+import com.example.paspaysweets.repository.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
@@ -15,10 +13,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
+import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.*;
@@ -30,12 +28,12 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -59,17 +57,15 @@ public class TelegramBot extends TelegramLongPollingBot {
     private final BotConfig config;
     private final UserNamesRepo userNamesRepo;
     private final CategoryRepo categoryRepo;
-    private final FileworkerSendingService fileworkerSendingService;
-    private final RestTemplate restTemplate;
+    private final TransactionsRepo transactionsRepo;
 
-    public TelegramBot(ProductRepo productRepo, UserRepo userRepo, BotConfig config, UserNamesRepo userNamesRepo, CategoryRepo categoryRepo, FileworkerSendingService fileworkerSendingService, RestTemplate restTemplate) {
+    public TelegramBot(ProductRepo productRepo, UserRepo userRepo, BotConfig config, UserNamesRepo userNamesRepo, CategoryRepo categoryRepo, TransactionsRepo transactionsRepo) {
         this.productRepo = productRepo;
         this.userRepo = userRepo;
         this.config = config;
         this.userNamesRepo = userNamesRepo;
         this.categoryRepo = categoryRepo;
-        this.fileworkerSendingService = fileworkerSendingService;
-        this.restTemplate = restTemplate;
+        this.transactionsRepo = transactionsRepo;
         List<BotCommand> listofCommands = new ArrayList<>();
         listofCommands.add(new BotCommand("/start", "начало"));
         listofCommands.add(new BotCommand("/info", "информация о боте"));
@@ -185,7 +181,37 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     public void getReport(long chatId) {
-        sendMessage(chatId, s3FileLink);
+        List<Transactions> transactions = transactionsRepo.findAll();
+        StringBuilder content = new StringBuilder();
+        for (Transactions transaction : transactions) {
+            var stringTrans = transaction.getName() + " " + transaction.getProductName() + " " + transaction.getPrice() + " " + transaction.getRegisteredAt();
+            content.append(stringTrans).append("\n");
+        }
+        java.io.File file = createFile(content.toString());
+        sendDocumentToTelegram(chatId, file);
+
+    }
+
+    private java.io.File createFile(String content) {
+        java.io.File file = new java.io.File("report.txt");
+        try (FileWriter writer = new FileWriter(file)) {
+            writer.write(content);
+        } catch (IOException e) {
+            sendMessage(config.getBotOwners().get(0), "не удалось записать транзакции в файл");
+        }
+        return file;
+    }
+
+    private void sendDocumentToTelegram(Long chatId, java.io.File file) {
+        SendDocument sendDocument = new SendDocument();
+        sendDocument.setChatId(chatId);
+        sendDocument.setDocument(new InputFile(file));
+
+        try {
+            execute(sendDocument);
+        } catch (TelegramApiException e) {
+            sendMessage(config.getBotOwners().get(0), "не отправить файл с репортом в телеграм" + chatId);
+        }
     }
 
     @Transactional(rollbackFor = IllegalArgumentException.class)
@@ -706,30 +732,18 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void sendResponseAndDocument(ShopUser user, Product product, Long chatId, int messageId) {
-        var todayDate = LocalDate.now().toString();
+        var todayDate = LocalDateTime.now();
         sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
         tryDeleteMessage(chatId, messageId);
-        String report = user.getFio() + " - " + product.getProductName() + " - " + product.getPrice() + " - " + todayDate + "\n";
-        String responseFromMerchantService = restTemplate.getForObject(reportFileUrl, String.class);
-        if (responseFromMerchantService == null) {
-            responseFromMerchantService = "";
-        }
-        byte[] bytesRes = responseFromMerchantService.getBytes();
-        String encodedString = new String(bytesRes, StandardCharsets.UTF_16);
-        String result = encodedString + report;
+        Transactions boughtProduct = new Transactions();
+        boughtProduct.setName(user.getFio());
+        boughtProduct.setPrice(product.getPrice());
+        boughtProduct.setProductName(product.getProductName());
+        boughtProduct.setRegisteredAt(todayDate);
+        transactionsRepo.save(boughtProduct);
+        String report = user.getFio() + " - " + product.getProductName() + " - " + product.getPrice() + " - " + todayDate.toString() + "\n";
         sendMessage(config.getBotOwners().get(0), report);
-        byte[] resultToByte = result.getBytes(StandardCharsets.UTF_16);
-        var responseFromFileworker = fileworkerSendingService.sendFileworkerRequest(resultToByte, "report.txt");
-        switch ((int) responseFromFileworker.getCode()) {
-            case 0:
-                responseFromFileworker.getMessage();
-                break;
-            default:
-                sendMessage(config.getBotOwners().get(0), "Не удалось добавить запись в файле s3");
-                log.error("Unexpected error due request to Filewoker service; requestId={}, exception={}", "requestId",
-                        responseFromFileworker.getMessage());
-                break;
-        }
+
     }
 
     private void handleCancelPurchase(Long chatId, String callbackData, int messageId) {
