@@ -9,7 +9,6 @@ import com.example.paspaysweets.repository.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.*;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,7 +43,9 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private final String NOT_REGISTERED = "Для взаимодействия с ботом пожалуйста зарегистрируйтесь(введите команду /register или в меню нажмите на эту же кнопку). Напоминаю, регистрацию могут пройти только сотрудники Paspay работающие из офиса";
     private final String INFO_TEXT = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ, по нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ" + " Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. ";
-    private final String LINK_MEET = "\n" + "https://meet.google.com/xmf-axvh-sgb?hs=224";
+    private final String DAILY_LINK_MEET = "\n" + "https://meet.google.com/xmf-axvh-sgb?hs=224";
+
+    private final String MONDAY_PLANNING_MEET_LINK = "\n" + "https://meet.google.com/nwj-gbwm-jiv";
 
     private final String INFO_TEXT_ADMIN = "Я бот для облегчения процесса взаимодействия с магазином вкусняшек paspay. После регистрации вам доступна кнопка СПИСОК ПРОДУКТОВ." + " По нажатии которой вам будет выведен соответствующий актуальный список продуктов. Вы можете выбрать нужный вам продукт нажатием кнопки ПРИОБРЕСТИ\"" + "Стоимость продукта будет зачислена в ваш долг либо списана с вашего кошелька. Для пополнения баланса обратитесь Светлане. Каждую пятницу вам будет приходить сообщение с суммой, которую нужно уплатить в бугалтерию. " + "\n➡\uFE0F Описание кнопок, которые доступны только админам: \n\uD83D\uDFE2 список продуктов  --  выводит список продуктов для покупки" + "\n\uD83D\uDFE2 добавить продукт  --  после нажатия кнопки боту нужно отправить файл в формате excel. Пожалуйста заполняйте только в определенном формате. За инструкцией обратитесь к Дмитрию" + "\n\uD83D\uDFE2 отправить сообщение всем  --  после нажатия кнопки бот попросит отправить ему нужное сообщение для рассылки." + "\n\uD83D\uDFE2 удалить пользователя  --  после нажатия кнопки нужно ввести имя пользователя, userName из телеграм. Получить имя можно например кнопкой ПРОВЕРКА БАЛАНСА ПОЛЬЗОВАТЕЛЕЙ." + "\n\uD83D\uDFE2  сброс всех продуктов  --  Производится сброс всех продуктов из базы данных. ВНИМАНИЕ! продукты и данные о них будут удалены безвозвратно! Для подтверждения действия нужно будет ввести на клавиатуре слово \"да\"" + "\n\uD83D\uDFE2 проверка долгов пользователей  --  в ответ отдает таблицу всех пользователей с их задолженностями" + "\n\uD83D\uDFE2 проверка баланса пользователей  --  отдает таблицу с балансом всех пользователей(кошелек, если кто-то например положил деньги заранее)" + "\n\uD83D\uDFE2 пополнение баланса пользователя  --  в ответ боту нужно ввести сообщение в виде chatId&сумма пополнения(84857584&400). Таблицу с chatId будет у вас в распечатанном виде, так же можно посмотреть его с помощью кнопки БАЛАНС ПОЛЬЗОВАТЕЛЕЙ" + "\n\uD83D\uDFE2 список продуктов  --  выдает список продуктов, которые есть в магазине в формате название-цена-количество";
 
@@ -538,7 +539,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    @Scheduled(cron = "0 11 17 * * FRI", zone = "GMT+05:00")
+    @Scheduled(cron = "0 30 16 * * FRI", zone = "GMT+05:00")
     public void sendFridayMessage() {
         var users = userRepo.findAll();
         for (ShopUser user : users) {
@@ -550,14 +551,22 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    @Scheduled(cron = "0 25 9 * * MON-FRI", zone = "GMT+05:00")
+    @Scheduled(cron = "0 25 9 * * TUE-FRI", zone = "GMT+05:00")
     public void sendMeetingLink() {
         List<Long> list = new ArrayList<>(Arrays.asList(1631579869L, 626332730L, 507062102L, 282572312L, 1658439256L,
-                772963240L, 1606172234L));
-        for (int i = 0; i < list.size(); i++) {
-            sendMessage(list.get(i), LINK_MEET + "\n" + "Доброе утро! Подключаемся к миту в 09:30.");
+                772963240L, 1606172234L, 514629519L));
+        for (Long aLong : list) {
+            sendMessage(aLong, DAILY_LINK_MEET + "\n" + "Доброе утро! Подключаемся к ежедневному миту в 09:30.");
         }
+    }
 
+    @Scheduled(cron = "0 55 9 * * MON", zone = "GMT+05:00")
+    public void sendPlanningMeetingLink() {
+        List<Long> list = new ArrayList<>(Arrays.asList(1631579869L, 626332730L, 507062102L, 282572312L, 1658439256L,
+                772963240L, 1606172234L, 514629519L));
+        for (Long aLong : list) {
+            sendMessage(aLong, MONDAY_PLANNING_MEET_LINK + "\n" + "Доброе утро! Подключаемся к миту по планированию в 10:00.");
+        }
     }
 
     public void handleCategoryCallback(Long chatId, String callbackData) {
