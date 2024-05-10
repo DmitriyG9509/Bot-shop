@@ -454,8 +454,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                     try {
                         // Удаление всех продуктов из базы данных
                         productRepo.deleteAll();
+                        transactionsRepo.deleteAll();
                         long chatId = update.getMessage().getChatId();
-                        sendMessage(chatId, "Все продукты успешно удалены из таблицы ✅");
+                        sendMessage(chatId, "Все продукты а так же старые записи о покупках успешно удалены из таблицы ✅");
                         log.info("All data dropped from the table by user " + chatId);
                     } catch (Exception e) {
                         long chatId = update.getMessage().getChatId();
