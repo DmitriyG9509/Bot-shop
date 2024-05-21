@@ -32,6 +32,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.sql.Timestamp;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -540,15 +542,19 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    @Scheduled(cron = "0 30 16 * * FRI", zone = "GMT+05:00")
-    public void sendFridayMessage() {
+    @Scheduled(cron = "0 0 16 * * FRI,TUE", zone = "GMT+05:00")
+    public void sendFridayDutyMessage() {
         var users = userRepo.findAll();
         for (ShopUser user : users) {
             var userDuty = user.getDuty();
             if (userDuty == 0) {
                 continue;
             }
-            sendMessage(user.getChatId(), "Привет! Ваш долг за вкусняшки на сегодня составляет: " + userDuty + " Тг \uD83D\uDCB2" + ". Пожалуйста, занесите денюжку в бухгалтерию. Хороших выходных! \uD83D\uDE09");
+            if (LocalDate.now().getDayOfWeek() == DayOfWeek.FRIDAY) {
+                sendMessage(user.getChatId(), "Привет! Ваш долг за вкусняшки на сегодня составляет: " + userDuty + " Тг \uD83D\uDCB2" + ". Пожалуйста, занесите денюжку в бухгалтерию. Хороших выходных! \uD83D\uDE09");
+            } else {
+                sendMessage(user.getChatId(), "Привет! Ваш долг за вкусняшки на сегодня составляет: " + userDuty + " Тг \uD83D\uDCB2" + ". Пожалуйста, занесите денюжку в бухгалтерию \uD83D\uDE09");
+            }
         }
     }
 
