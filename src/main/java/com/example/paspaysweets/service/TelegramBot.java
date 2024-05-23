@@ -736,6 +736,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                     user.setCash(0L);
                     userRepo.save(user);
                     sendResponseAndDocument(user, product, chatId, messageId);
+                    totalSum.setTotalSum(totalSum.getTotalSum() + product.getPrice());
+                    userTotalSumRepo.save(totalSum);
                 }
             } else {
                 sendMessage(chatId, "К сожалению, товар закончился.");
