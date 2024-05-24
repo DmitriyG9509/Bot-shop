@@ -760,7 +760,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         transactionsRepo.save(boughtProduct);
         String report = user.getFio() + " - " + product.getProductName() + " - " + product.getPrice() + " - " + todayDate.toString() + "\n";
         sendMessage(config.getBotOwners().get(0), report);
-
+        sendMessage(config.getBotOwners().get(2), report);
     }
 
     private void handleCancelPurchase(Long chatId, String callbackData, int messageId) {
