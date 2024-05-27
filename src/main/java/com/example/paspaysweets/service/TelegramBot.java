@@ -244,7 +244,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                         long productType = (long) productTypeCell.getNumericCellValue();
                         Product product = new Product();
                         product.setProductName(productName);
-                        product.setPrice(price);
+                        product.setPrice((long) Math.ceil(price + price * 8 / 100.0));  //Автоматическая надбавка 8% к стоимости и округление к большему
                         product.setQuantity(quantity);
                         ProductCategory category = categoryRepo.findById(productType).orElse(null);
                         product.setCategory(category);
