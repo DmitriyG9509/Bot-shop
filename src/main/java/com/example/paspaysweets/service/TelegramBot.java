@@ -29,9 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.sql.Timestamp;
-import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.*;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -749,7 +747,8 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void sendResponseAndDocument(ShopUser user, Product product, Long chatId, int messageId) {
-        var todayDate = LocalDateTime.now();
+        ZonedDateTime todayDateWithZone = ZonedDateTime.now(ZoneId.of("GMT+05:00"));
+        LocalDateTime todayDate = todayDateWithZone.toLocalDateTime();
         sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
         tryDeleteMessage(chatId, messageId);
         Transactions boughtProduct = new Transactions();
