@@ -322,6 +322,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                             userRepo.save(user);
                             sendMessage(chatId, "Задолженность пользователя с chatId " + targetUserChatId + " успешно погашена.");
                             sendMessage(Long.parseLong(targetUserChatId), "Ваша задолженность успешно погашена.");
+                            sendMessage(config.getBotOwners().get(0), "Баланс юзера " + targetUserChatId + "пополнен на " + targetSum);
                             botState = BotState.IDLE;
                             return;
                         }
@@ -331,6 +332,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                             userRepo.save(user);
                             sendMessage(chatId, "Баланс пользователя с chatId " + targetUserChatId + " пополнен, а также успешно погашен его долг.");
                             sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс успешно пополнен, а также погашен долг.");
+                            sendMessage(config.getBotOwners().get(0), "Баланс юзера " + targetUserChatId + "пополнен на " + targetSum);
                             botState = BotState.IDLE;
                             return;
                         } else if (sum >= 0 && user.getDuty() == 0) {
@@ -338,6 +340,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                             userRepo.save(user);
                             sendMessage(chatId, "Баланс пользователя с chatId " + targetUserChatId + " успешно пополнен.");
                             sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс успешно пополнен и составляет " + sum + ".");
+                            sendMessage(config.getBotOwners().get(0), "Баланс юзера " + targetUserChatId + "пополнен на " + targetSum);
                             botState = BotState.IDLE;
                             return;
                         } else {
@@ -346,6 +349,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                             userRepo.save(user);
                             sendMessage(chatId, "Баланс пользователя с chatId " + targetUserChatId + " пополнен, но только частично из-за его долга.");
                             sendMessage(Long.parseLong(targetUserChatId), "Ваш баланс успешно пополнен, но только частично из-за вашего долга. Ваш текущий долг: " + (-(sum)));
+                            sendMessage(config.getBotOwners().get(0), "Баланс юзера " + targetUserChatId + "пополнен на " + targetSum);
                             botState = BotState.IDLE;
                         }
                     } catch (NumberFormatException e) {
