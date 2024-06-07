@@ -10,11 +10,13 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
 import org.telegram.telegrambots.meta.api.methods.GetFile;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendDocument;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.methods.updatingmessages.EditMessageReplyMarkup;
 import org.telegram.telegrambots.meta.api.objects.*;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
@@ -151,20 +153,60 @@ public class TelegramBot extends TelegramLongPollingBot {
             Long chatId = callbackQuery.getMessage().getChatId();
             String callbackData = callbackQuery.getData();
             var messageId = callbackQuery.getMessage().getMessageId();
+            var callbackQueryId = callbackQuery.getId();
+
             if (callbackData.startsWith("purchase")) {
                 handlePurchaseCallback(chatId, callbackData);
+                removeInlineKeyboard(chatId, messageId); // Удаляем клавиатуру после обработки
+                answerCallbackQuery(callbackQueryId); // Отправляем ответ на колбэк-запрос
             } else if (callbackData.startsWith("view_category")) {
                 handleCategoryCallback(chatId, callbackData);
+                //removeInlineKeyboard(chatId, messageId); // Удаляем клавиатуру после обработки
+                answerCallbackQuery(callbackQueryId); // Отправляем ответ на колбэк-запрос
             } else if (callbackData.startsWith("confirm_purchase") || callbackData.startsWith("cancel_purchase")) {
                 handleConfirmationCallback(chatId, callbackData, messageId);
+                removeInlineKeyboard(chatId, messageId); // Удаляем клавиатуру после обработки
+                answerCallbackQuery(callbackQueryId); // Отправляем ответ на колбэк-запрос
             }
         }
 
     }
 
+    private void answerCallbackQuery(String callbackQueryId) {
+        AnswerCallbackQuery answer = new AnswerCallbackQuery();
+        answer.setCallbackQueryId(callbackQueryId);
+        try {
+            execute(answer);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred while answering callback query: " + e);
+        }
+    }
+
+    private void removeInlineKeyboard(Long chatId, Integer messageId) {
+        EditMessageReplyMarkup editMarkup = new EditMessageReplyMarkup();
+        editMarkup.setChatId(chatId.toString());
+        editMarkup.setMessageId(messageId);
+        editMarkup.setReplyMarkup(null); // Устанавливаем клавиатуру в null, чтобы удалить её
+
+        try {
+            execute(editMarkup);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred while removing inline keyboard: " + e);
+        }
+    }
+
     public boolean isChatIdBotOwner(List<Long> botOwners, long chatId) {
         for (Long owner : botOwners) {
             if (owner == chatId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean isChatHr(List<Long> botHr, long chatId) {
+        for (Long hr : botHr) {
+            if (hr == chatId) {
                 return true;
             }
         }
@@ -250,10 +292,10 @@ public class TelegramBot extends TelegramLongPollingBot {
                     } catch (RuntimeException e) {
                         for (int j = 0; j < config.getBotOwners().size(); j++) {
                             sendMessage(config.getBotOwners()
-                                              .get(j), "при добавлении продуктов в excel файле введены не коррректные данные. Пожалуйста, произведите сброс базы данных и повторите попытку.");
+                                    .get(j), "при добавлении продуктов в excel файле введены не коррректные данные. Пожалуйста, произведите сброс базы данных и повторите попытку.");
                         }
                         log.error("Некорректные данные в excel файле при добавлении продуктов от пользователя - " + update.getMessage()
-                                                                                                                          .getChatId());
+                                .getChatId());
                         throw new IllegalArgumentException("Некорректные данные в excel файле при добавлении продуктов");
                     }
 
@@ -474,14 +516,14 @@ public class TelegramBot extends TelegramLongPollingBot {
             case IDLE:
                 // Бот находится в простое, отправляем запрос на подтверждение
                 sendMessage(update.getMessage()
-                                  .getChatId(), "Если действительно хотите удалить все продукты из базы, пожалуйста, напишите слово \"да\" в ответ. \nЕсли нажатие было случайным то просто проигнорируйте");
+                        .getChatId(), "Если действительно хотите удалить все продукты из базы, пожалуйста, напишите слово \"да\" в ответ. \nЕсли нажатие было случайным то просто проигнорируйте");
                 // Переключаем состояние бота
                 botState = BotState.WAITING_FOR_CONFIRMATION;
                 break;
             default:
                 // В случае других состояний просто игнорируем запрос на сброс данных
                 sendMessage(update.getMessage()
-                                  .getChatId(), "Пожалуйста, завершите текущую операцию, прежде чем выполнять сброс данных.");
+                        .getChatId(), "Пожалуйста, завершите текущую операцию, прежде чем выполнять сброс данных.");
                 break;
         }
     }
@@ -672,8 +714,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                 handleConfirmPurchase(chatId, callbackData, messageId);
                 new Thread(() -> {
                     try {
-                        Thread.sleep(1000); // Задержка в 2 секунды
+                        Thread.sleep(1000); // Задержка в 1 секунду
                         buttonStateMap.remove(chatId);
+                        tryDeleteMessage(chatId, messageId); // Удаление сообщения
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -684,8 +727,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                 handleCancelPurchase(chatId, callbackData, messageId);
                 new Thread(() -> {
                     try {
-                        Thread.sleep(1000); // Задержка в 2 секунды
+                        Thread.sleep(1000); // Задержка в 1 секунду
                         buttonStateMap.remove(chatId);
+                        tryDeleteMessage(chatId, messageId); // Удаление сообщения
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -694,10 +738,9 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
         }
 
-// Если кнопка уже была нажата или не выполнено ни одно из действий, отправляем сообщение об ошибке
-        sendMessage(chatId, "Произошла непредвиденная ошибка либо вы случайно нажали на подверждение покупки дважды");
-        sendMessage(config.getBotOwners()
-                          .get(0), "Не удалось обработать подтверждение покупки, ошибка." + chatId + buttonStateMap.toString());
+        // Если кнопка уже была нажата или не выполнено ни одно из действий, отправляем сообщение об ошибке
+        sendMessage(chatId, "Произошла непредвиденная ошибка либо вы случайно нажали на подтверждение покупки дважды");
+        sendMessage(config.getBotOwners().get(0), "Не удалось обработать подтверждение покупки, ошибка." + chatId + buttonStateMap.toString());
     }
 
     private void tryDeleteMessage(Long chatId, Integer messageId) {
@@ -706,7 +749,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             execute(deleteMessage);
         } catch (TelegramApiException e) {
             sendMessage(config.getBotOwners()
-                              .get(0), "Ошибка удаления сообщения подтверждения покупки, юзер " + chatId);
+                    .get(0), "Ошибка удаления сообщения подтверждения покупки, юзер " + chatId);
             log.error("Ошибка удаления сообщения подтверждения покупки, юзер" + chatId);
         }
     }
@@ -754,7 +797,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         ZonedDateTime todayDateWithZone = ZonedDateTime.now(ZoneId.of("GMT+05:00"));
         LocalDateTime todayDate = todayDateWithZone.toLocalDateTime();
         sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
-        tryDeleteMessage(chatId, messageId);
+//        tryDeleteMessage(chatId, messageId);
         Transactions boughtProduct = new Transactions();
         boughtProduct.setName(user.getFio());
         boughtProduct.setPrice(product.getPrice());
@@ -769,7 +812,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     private void handleCancelPurchase(Long chatId, String callbackData, int messageId) {
         Long productId = Long.parseLong(callbackData.split("_")[2]);
         sendMessage(chatId, "Вы отменили покупку товара ❌");
-        tryDeleteMessage(chatId, messageId);
+//        tryDeleteMessage(chatId, messageId);
     }
 
     public void sendMessageWithInlineKeyboard(long chatId, String text, InlineKeyboardMarkup keyboardMarkup) {
