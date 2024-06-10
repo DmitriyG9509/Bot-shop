@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.net.URL;
 import java.sql.Timestamp;
 import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -129,6 +130,7 @@ public class TelegramBot extends TelegramLongPollingBot {
                             }
                             case "Список продуктов \uD83D\uDCDD" -> sendProductCategories(chatId);
                             case "Мой баланс и задолженность \uD83D\uDEE1\uFE0F" -> sendUserDutyAndBalance(chatId);
+                            case "История моих покупок \uD83D\uDCDC" -> sendUserTransactionHistory(chatId);
                             case "Отправить сообщение всем \uD83D\uDCE9" -> sendMessageToAll(update);
                             case "Добавить продукт ➕" -> requestProductInfo(chatId);
                             case "Удалить пользователя \uD83D\uDDD1\uFE0F" -> requestUserNameToDelete(chatId);
@@ -179,6 +181,33 @@ public class TelegramBot extends TelegramLongPollingBot {
             execute(answer);
         } catch (TelegramApiException e) {
             log.error("Error occurred while answering callback query: " + e);
+        }
+    }
+
+    private void sendUserTransactionHistory(Long chatId) {
+        var userEntity = userRepo.findByChatId(chatId);
+        String userFio = null;
+        if (userEntity.isPresent()) {
+            userFio = userEntity.get().getFio();
+        }
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        var transactionsEntity = transactionsRepo.findAllByName(userFio);
+        var firstTransactionEntity = transactionsRepo.findFirstByOrderByIdAsc();
+        if (firstTransactionEntity.isEmpty()) {
+            sendMessage(chatId, "У вас пока нет покупок");
+            return;
+        }
+        if (transactionsEntity.isEmpty()) {
+            sendMessage(chatId, "у вас нет покупок за период с " + firstTransactionEntity.get().getRegisteredAt().toLocalDate().format(dateFormatter));
+            return;
+        }
+
+        StringBuilder transactionsList = new StringBuilder("Список продуктов, которые вы приобрели за период с  " + firstTransactionEntity.get().getRegisteredAt().toLocalDate().format(dateFormatter) + " до " + LocalDate.now() + "\n\n");
+        for (Transactions transaction : transactionsEntity) {
+            String transactionInfo = "Название: " + transaction.getProductName() + "\n" + "Цена: " + transaction.getPrice() + "\n" + "Дата покупки: " + transaction.getRegisteredAt() + "\n\n";
+            transactionsList.append(transactionInfo);
+            sendMessage(chatId, transactionsList.toString());
+            log.info("Отправлен список транзакций пользователю: " + chatId);
         }
     }
 
@@ -796,7 +825,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     private void sendResponseAndDocument(ShopUser user, Product product, Long chatId, int messageId) {
         ZonedDateTime todayDateWithZone = ZonedDateTime.now(ZoneId.of("GMT+05:00"));
         LocalDateTime todayDate = todayDateWithZone.toLocalDateTime();
-        sendMessage(chatId, "Вы успешно приобрели товар! Спасибо за покупку.");
+        sendMessage(chatId, "Вы успешно приобрели товар " + product.getProductName() + ". Спасибо за покупку!");
 //        tryDeleteMessage(chatId, messageId);
         Transactions boughtProduct = new Transactions();
         boughtProduct.setName(user.getFio());
@@ -941,6 +970,10 @@ public class TelegramBot extends TelegramLongPollingBot {
         KeyboardRow row2 = new KeyboardRow();
         row2.add("  Мой баланс и задолженность \uD83D\uDEE1\uFE0F  ");
         keyboardRows.add(row2);
+
+        KeyboardRow row14 = new KeyboardRow();
+        row14.add("  История моих покупок \uD83D\uDCDC  ");
+        keyboardRows.add(row14);
 
         if (isChatIdBotOwner(config.getBotOwners(), chatId)) {
             KeyboardRow row3 = new KeyboardRow();

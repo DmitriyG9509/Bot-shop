@@ -28,4 +28,6 @@ public interface UserRepo extends JpaRepository<ShopUser, Long> {
     void increaseCash(@Param("amount") Long amount, @Param("chatId") Long chatId);
 
     boolean existsByUserName(String userName);
+
+    Optional<ShopUser> findByUserName(String userName);
 }
