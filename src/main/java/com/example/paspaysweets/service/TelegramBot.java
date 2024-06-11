@@ -914,10 +914,11 @@ public class TelegramBot extends TelegramLongPollingBot {
             user.setRegisteredAt(new Timestamp(System.currentTimeMillis()));
             userRepo.save(user);
 
-            UserTotalSum totalSum = new UserTotalSum();
-            totalSum.setChatId(chatId);
-            totalSum.setTotalSum(0L);
-            userTotalSumRepo.save(totalSum);
+//            UserTotalSum totalSum = new UserTotalSum();
+//            totalSum.setChatId(chatId);
+//            totalSum.setTotalSum(0L);
+//            totalSum.setName(" ");
+//            userTotalSumRepo.save(totalSum);
             String successMessage = "Вы успешно зарегистрированы. Теперь вы можете пользоваться функциями бота и кушоть вкусняшки \uD83C\uDF6B";
             sendMessage(chatId, successMessage);
 
