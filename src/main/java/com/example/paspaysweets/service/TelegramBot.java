@@ -918,17 +918,9 @@ public class TelegramBot extends TelegramLongPollingBot {
             totalSum.setChatId(chatId);
             totalSum.setTotalSum(0L);
             userTotalSumRepo.save(totalSum);
-
             String successMessage = "Вы успешно зарегистрированы. Теперь вы можете пользоваться функциями бота и кушоть вкусняшки \uD83C\uDF6B";
-            SendMessage successResponse = new SendMessage();
-            successResponse.setChatId(String.valueOf(chatId));
-            successResponse.setText(successMessage);
+            sendMessage(chatId, successMessage);
 
-            try {
-                execute(successResponse);
-            } catch (TelegramApiException e) {
-                log.error("Error occurred while sending registration success message: " + e);
-            }
         } else {
             String notExistMessage = "Вы не являетесь сотрудником офиса paspay в городе Караганда. Регистрироваться могут только сотрудники, которые работают в inHouse формате";
             SendMessage notExistResponse = new SendMessage();
