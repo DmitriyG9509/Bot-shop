@@ -55,16 +55,14 @@ public class TelegramBot extends TelegramLongPollingBot {
     private final UserNamesRepo userNamesRepo;
     private final CategoryRepo categoryRepo;
     private final TransactionsRepo transactionsRepo;
-    private final UserTotalSumRepo userTotalSumRepo;
 
-    public TelegramBot(ProductRepo productRepo, UserRepo userRepo, BotConfig config, UserNamesRepo userNamesRepo, CategoryRepo categoryRepo, TransactionsRepo transactionsRepo, UserTotalSumRepo userTotalSumRepo) {
+    public TelegramBot(ProductRepo productRepo, UserRepo userRepo, BotConfig config, UserNamesRepo userNamesRepo, CategoryRepo categoryRepo, TransactionsRepo transactionsRepo) {
         this.productRepo = productRepo;
         this.userRepo = userRepo;
         this.config = config;
         this.userNamesRepo = userNamesRepo;
         this.categoryRepo = categoryRepo;
         this.transactionsRepo = transactionsRepo;
-        this.userTotalSumRepo = userTotalSumRepo;
         List<BotCommand> listofCommands = new ArrayList<>();
         listofCommands.add(new BotCommand("/start", "начало"));
         listofCommands.add(new BotCommand("/info", "информация о боте"));
@@ -788,11 +786,9 @@ public class TelegramBot extends TelegramLongPollingBot {
         Long productId = Long.parseLong(callbackData.split("_")[2]);
         Optional<Product> optionalProductBase = productRepo.findById(productId);
         Optional<ShopUser> optionalShopUser = userRepo.findByChatId(chatId);
-        Optional<UserTotalSum> optionalUserTotalSum = userTotalSumRepo.findByChatId(chatId);
         if (optionalProductBase.isPresent() && optionalShopUser.isPresent()) {
             Product product = optionalProductBase.get();
             ShopUser user = optionalShopUser.get();
-            UserTotalSum totalSum = optionalUserTotalSum.get();
 
             // Уменьшаем количество товара
             if (product.getQuantity() > 0) {
@@ -801,17 +797,15 @@ public class TelegramBot extends TelegramLongPollingBot {
                 var count = user.getCash() - product.getPrice();
                 if (count >= 0) {
                     user.setCash(count);
+                    user.setTotalSum(user.getTotalSum() + product.getPrice());
                     userRepo.save(user);
                     sendResponseAndDocument(user, product, chatId, messageId);
-                    totalSum.setTotalSum(totalSum.getTotalSum() + product.getPrice());
-                    userTotalSumRepo.save(totalSum);
                 } else {
                     user.setDuty((-(count)) + user.getDuty());
                     user.setCash(0L);
+                    user.setTotalSum(user.getTotalSum() + product.getPrice());
                     userRepo.save(user);
                     sendResponseAndDocument(user, product, chatId, messageId);
-                    totalSum.setTotalSum(totalSum.getTotalSum() + product.getPrice());
-                    userTotalSumRepo.save(totalSum);
                 }
             } else {
                 sendMessage(chatId, "К сожалению, товар закончился.");
@@ -912,13 +906,9 @@ public class TelegramBot extends TelegramLongPollingBot {
             user.setUserName(chat.getUserName());
             user.setName(chat.getFirstName());
             user.setRegisteredAt(new Timestamp(System.currentTimeMillis()));
+            user.setTotalSum(0L);
             userRepo.save(user);
 
-//            UserTotalSum totalSum = new UserTotalSum();
-//            totalSum.setChatId(chatId);
-//            totalSum.setTotalSum(0L);
-//            totalSum.setName(" ");
-//            userTotalSumRepo.save(totalSum);
             String successMessage = "Вы успешно зарегистрированы. Теперь вы можете пользоваться функциями бота и кушоть вкусняшки \uD83C\uDF6B";
             sendMessage(chatId, successMessage);
 

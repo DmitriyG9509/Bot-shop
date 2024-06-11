@@ -1,8 +1,6 @@
 package com.example.paspaysweets.model;
 
 import jakarta.persistence.*;
-import jakarta.ws.rs.DefaultValue;
-import lombok.Builder;
 import lombok.Data;
 
 import java.sql.Timestamp;
@@ -36,6 +34,10 @@ public class ShopUser {
 
     @Column(name = "cash")
     private Long cash;
+
+    @Column(name = "total_sum")
+    private Long totalSum;
+
     public String getUsername() {
         return userName;
     }
