@@ -206,9 +206,9 @@ public class TelegramBot extends TelegramLongPollingBot {
         for (Transactions transaction : transactionsEntity) {
             String transactionInfo = "Название: " + transaction.getProductName() + "\n" + "Цена: " + transaction.getPrice() + "\n" + "Дата покупки: " + transaction.getRegisteredAt() + "\n\n";
             transactionsList.append(transactionInfo);
-            sendMessage(chatId, transactionsList.toString());
-            log.info("Отправлен список транзакций пользователю: " + chatId);
         }
+        sendMessage(chatId, transactionsList.toString());
+        log.info("Отправлен список транзакций пользователю: " + chatId);
     }
 
     private void removeInlineKeyboard(Long chatId, Integer messageId) {
