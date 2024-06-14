@@ -519,6 +519,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         if (userExists.isPresent()) { //TODO тут доделать
             try {
                 userRepo.deleteByUserName(userNameToDelete);
+                sendMessage(chatId, "Баланс пользователя = "  + userExists.get().getCash() + ".  Задолженность пользователя = " + userExists.get().getDuty());
                 sendMessage(chatId, "Пользователь " + userNameToDelete + " успешно удален из базы данных по вкусняшкам.");
                 sendMessage(config.getBotOwners().get(0), "Пользователь " + userNameToDelete + " успешно удален из базы данных по вкусняшкам");
                 sendMessage(config.getBotOwners().get(2), "Пользователь " + userNameToDelete + " успешно удален из базы данных по вкусняшкам");
