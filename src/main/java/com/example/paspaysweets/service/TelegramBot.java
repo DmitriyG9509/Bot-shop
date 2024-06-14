@@ -117,6 +117,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                         // Бот ожидает подтверждения перед удалением всех продуктов
                         sendMessageToAll(update);
                         break;
+                    case WAITING_FOR_NAME_FOR_ADD:
+                        //Бот ожидает имя пользователя
+                        addUserToPaspayUserTable(chatId, messageText);
                     case IDLE:
                         // Если бот находится в простое, обрабатываем команды и запросы пользователя
                         switch (messageText) {
@@ -131,15 +134,16 @@ public class TelegramBot extends TelegramLongPollingBot {
                             case "История моих покупок \uD83D\uDCDC" -> sendUserTransactionHistory(chatId);
                             case "Отправить сообщение всем \uD83D\uDCE9" -> sendMessageToAll(update);
                             case "Добавить продукт ➕" -> requestProductInfo(chatId);
-                            case "Удалить пользователя \uD83D\uDDD1\uFE0F" -> requestUserNameToDelete(chatId);
                             case "Список оставшихся продуктов \uD83E\uDDFE" -> sendProductList(chatId);
                             case "Сброс всех продуктов ❌" -> dropData(update);
                             case "Проверка долгов пользователей \uD83D\uDC6E" -> userDuty(update);
                             case "Проверка баланса пользователей \uD83D\uDCB2" -> userBalance(update);
                             case "Пополнение баланса пользователя \uD83D\uDCB0" -> putCash(update);
                             case "Получить отчет по покупкам \uD83D\uDCC8" -> getReport(chatId);
+                            case "Добавить нового пользователя \uD83D\uDFE2" -> addNewUser(chatId);
+                            case "Удалить пользователя ⛔" -> requestUserNameToDelete(chatId);
                             default ->
-                                    sendMessage(chatId, messageText.equals("/register") ? "Вы уже зарегистрированы" : "Данной команды не существует");
+                                    sendMessage(chatId, messageText.equals("/register") ? "Вы уже зарегистрированы" : "");
                         }
                         break;
                 }
@@ -496,20 +500,66 @@ public class TelegramBot extends TelegramLongPollingBot {
         botState = BotState.WAITING_FOR_USER_NAME;
     }
 
-    private void removeUser(long chatId, String userNameToDelete) {
-        boolean userExists = userRepo.existsByUserName(userNameToDelete);
-        if (userExists) {
+    private void addNewUser(long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("Введите имя пользователя, которого вы хотите добавить:");
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred while sending message: " + e);
+        }
+        botState = BotState.WAITING_FOR_NAME_FOR_ADD;
+    }
+    @Transactional
+    protected void removeUser(long chatId, String userNameToDelete) {
+        var userExists = userRepo.findByUserName(userNameToDelete);
+        var paspayUserName = userNamesRepo.findByUserNameOffice(userNameToDelete);
+        if (userExists.isPresent()) { //TODO тут доделать
             try {
                 userRepo.deleteByUserName(userNameToDelete);
-                sendMessage(chatId, "Пользователь " + userNameToDelete + " успешно удален из базы данных.");
+                sendMessage(chatId, "Пользователь " + userNameToDelete + " успешно удален из базы данных по вкусняшкам.");
+                sendMessage(config.getBotOwners().get(0), "Пользователь " + userNameToDelete + " успешно удален из базы данных по вкусняшкам");
+                sendMessage(config.getBotOwners().get(2), "Пользователь " + userNameToDelete + " успешно удален из базы данных по вкусняшкам");
                 log.info("User removed from the table by user " + chatId);
             } catch (Exception e) {
                 sendMessage(chatId, "Ошибка при удалении пользователя. Пожалуйста, попробуйте ещё раз.");
                 log.error("Error occurred while removing user by user " + chatId, e);
                 return; // Выйдем из метода, чтобы не переключить состояние бота на IDLE
             }
+        }
+        if (paspayUserName.isPresent()) {
+            userNamesRepo.deleteByUserNameOffice(userNameToDelete);
+            sendMessage(chatId, "Пользователь " + userNameToDelete + " успешно удален из базы данных для регистрации в боте.");
+            sendMessage(config.getBotOwners().get(0), "Пользователь " + userNameToDelete + " успешно удален из базы данных для регистрации в боте");
+            sendMessage(config.getBotOwners().get(2), "Пользователь " + userNameToDelete + " успешно удален из базы данных для регистрации в боте");
         } else {
             sendMessage(chatId, "Пользователь с именем " + userNameToDelete + " не найден в базе данных.");
+        }
+
+        // Возвращаем состояние бота в IDLE после успешного удаления пользователя или если пользователя не существует
+        botState = BotState.IDLE;
+    }
+
+    private void addUserToPaspayUserTable(long chatId, String userNameToAdd) {
+        var paspayUserName = userNamesRepo.findByUserNameOffice(userNameToAdd);
+        if (paspayUserName.isEmpty()) {
+            try {
+                PaspayUserNames paspayUserNames = new PaspayUserNames();
+                paspayUserNames.setUserNameOffice(userNameToAdd);
+                userNamesRepo.save(paspayUserNames);
+                sendMessage(chatId, "Пользователь " + userNameToAdd + " успешно добавлен в базу данных.");
+                sendMessage(config.getBotOwners().get(0), "Пользователь " + userNameToAdd + " успешно добавлен в БД и может регистрироваться");
+                sendMessage(config.getBotOwners().get(2), "Пользователь " + userNameToAdd + " успешно добавлен в БД и может регистрироваться");
+                log.info("User added to the table by user " + chatId);
+            } catch (Exception e) {
+                sendMessage(chatId, "Ошибка при добавлении пользователя. Пожалуйста, попробуйте ещё раз.");
+                log.error("Error occurred while adding user by user " + chatId, e);
+                return; // Выйдем из метода, чтобы не переключить состояние бота на IDLE
+            }
+        } else {
+            sendMessage(chatId, "Пользователь с именем " + userNameToAdd + " уже есть в базе данных!");
         }
 
         // Возвращаем состояние бота в IDLE после успешного удаления пользователя или если пользователя не существует
@@ -877,7 +927,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     enum BotState {
-        WAITING_FOR_USER_NAME, WAITING_FOR_CONFIRMATION, WAITING_FOR_USER_INFO, WAITING_FOR_MESSAGE, IDLE
+        WAITING_FOR_USER_NAME, WAITING_FOR_CONFIRMATION, WAITING_FOR_USER_INFO, WAITING_FOR_MESSAGE, WAITING_FOR_NAME_FOR_ADD, IDLE
     }
 
     BotState botState = BotState.IDLE;
@@ -967,10 +1017,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             row4.add("  Отправить сообщение всем \uD83D\uDCE9  ");
             keyboardRows.add(row4);
 
-            KeyboardRow row5 = new KeyboardRow();
-            row5.add("  Удалить пользователя \uD83D\uDDD1\uFE0F  ");
-            keyboardRows.add(row5);
-
             KeyboardRow row6 = new KeyboardRow();
             row6.add("  Сброс всех продуктов ❌  ");
             keyboardRows.add(row6);
@@ -994,6 +1040,15 @@ public class TelegramBot extends TelegramLongPollingBot {
             KeyboardRow row11 = new KeyboardRow();
             row11.add("  Получить отчет по покупкам \uD83D\uDCC8  ");
             keyboardRows.add(row11);
+        }
+        if (isChatHr(config.getBotHr(), chatId)) {
+            KeyboardRow row12 = new KeyboardRow();
+            row12.add("  Добавить нового пользователя \uD83D\uDFE2  ");
+            keyboardRows.add(row12);
+
+            KeyboardRow row13 = new KeyboardRow();
+            row13.add("  Удалить пользователя ⛔  ");
+            keyboardRows.add(row13);
         }
         keyboardMarkup.setKeyboard(keyboardRows);
         message.setReplyMarkup(keyboardMarkup);

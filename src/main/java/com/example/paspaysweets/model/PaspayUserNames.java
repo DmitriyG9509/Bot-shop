@@ -5,6 +5,7 @@ import lombok.Data;
 
 @Data
 @Entity(name = "paspayUserNames")
+@NamedQuery(name = "PaspayUserNames.deleteByUserNameOffice", query = "DELETE FROM paspayUserNames u WHERE u.userNameOffice = :userName")
 public class PaspayUserNames {
     @Id
     @Column(name = "id")
