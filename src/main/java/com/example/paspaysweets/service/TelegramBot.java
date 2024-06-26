@@ -56,6 +56,9 @@ public class TelegramBot extends TelegramLongPollingBot {
     private final CategoryRepo categoryRepo;
     private final TransactionsRepo transactionsRepo;
 
+    List<Long> dailyMeet = new ArrayList<>(Arrays.asList(1631579869L, 626332730L, 507062102L, 282572312L, 1658439256L,
+            772963240L, 1606172234L, 514629519L));
+
     public TelegramBot(ProductRepo productRepo, UserRepo userRepo, BotConfig config, UserNamesRepo userNamesRepo, CategoryRepo categoryRepo, TransactionsRepo transactionsRepo) {
         this.productRepo = productRepo;
         this.userRepo = userRepo;
@@ -120,6 +123,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                     case WAITING_FOR_NAME_FOR_ADD:
                         //Бот ожидает имя пользователя
                         addUserToPaspayUserTable(chatId, messageText);
+                    case WAITING_FOR_CHAT_ID_FOR_ADD_TO_DAILY_MEET:
+                        //Бот ожидает chatID пользователя
+                        addUserToDailyMeetExecute(chatId, messageText);
+                    case WAITING_FOR_CHAT_ID_FOR_DELETE_FROM_DAILY_MEET:
+                        //Бот ожидает chatID пользователя
+                        deleteUserToDailyMeetExecute(chatId, messageText);
                     case IDLE:
                         // Если бот находится в простое, обрабатываем команды и запросы пользователя
                         switch (messageText) {
@@ -142,6 +151,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                             case "Получить отчет по покупкам \uD83D\uDCC8" -> getReport(chatId);
                             case "Добавить нового пользователя \uD83D\uDFE2" -> addNewUser(chatId);
                             case "Удалить пользователя ⛔" -> requestUserNameToDelete(chatId);
+                            case "Добавить юзера на daily meet \uD83D\uDCC5" -> addUserToDailyMeet(chatId);
+                            case "Удалить юзера из daily meet \uD83D\uDDD1\uFE0F" -> deleteUserFromDailyMeet(chatId);
+                            case "список имя/chatId \uD83E\uDDFE" -> getAllUsersChatId(chatId);
                             default ->
                                     sendMessage(chatId, messageText.equals("/register") ? "Вы уже зарегистрированы" : "");
                         }
@@ -184,6 +196,60 @@ public class TelegramBot extends TelegramLongPollingBot {
         } catch (TelegramApiException e) {
             log.error("Error occurred while answering callback query: " + e);
         }
+    }
+
+    private void getAllUsersChatId(Long chatId) {
+        var userEntity = userRepo.findAll();
+        var finalList = new HashMap<Long, String>();
+        for (ShopUser shopUser : userEntity) {
+            var userName = shopUser.getName();
+            var userChatId = shopUser.getChatId();
+            finalList.put(userChatId, userName);
+        }
+        StringBuilder messageBuilder = new StringBuilder();
+        for (Map.Entry<Long, String> entry : finalList.entrySet()) {
+            messageBuilder.append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
+        }
+
+        sendMessage(chatId, messageBuilder.toString());
+    }
+
+    private void addUserToDailyMeet(Long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("Введите chatId пользователя, которого вы хотите добавить:");
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred while sending message: " + e);
+        }
+        botState = BotState.WAITING_FOR_CHAT_ID_FOR_ADD_TO_DAILY_MEET;
+    }
+
+    private void deleteUserFromDailyMeet(Long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(String.valueOf(chatId));
+        message.setText("Введите chatId пользователя, которого вы хотите удалить:");
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            log.error("Error occurred while sending message: " + e);
+        }
+        botState = BotState.WAITING_FOR_CHAT_ID_FOR_DELETE_FROM_DAILY_MEET;
+    }
+
+    private void addUserToDailyMeetExecute(Long chatId, String chatIdForAdd) {
+        dailyMeet.add(Long.parseLong(chatIdForAdd));
+        sendMessage(chatId, "Пользователь успешно добавлен на рассылку ссылки на daily meet");
+        sendMessage(Long.parseLong(chatIdForAdd), "Вы добавлены на рассылку ссылки на daily meet");
+    }
+
+    private void deleteUserToDailyMeetExecute(Long chatId, String chatIdForDelete) {
+        dailyMeet.add(Long.parseLong(chatIdForDelete));
+        sendMessage(chatId, "Пользователь успешно удален из рассылки ссылки на daily meet");
+        sendMessage(Long.parseLong(chatIdForDelete), "Вы удалены из рассылки ссылки на daily meet");
     }
 
     private void sendUserTransactionHistory(Long chatId) {
@@ -238,6 +304,15 @@ public class TelegramBot extends TelegramLongPollingBot {
     public boolean isChatHr(List<Long> botHr, long chatId) {
         for (Long hr : botHr) {
             if (hr == chatId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean isChatAdmin(List<Long> botAdmin, long chatId) {
+        for (Long admin : botAdmin) {
+            if (admin == chatId) {
                 return true;
             }
         }
@@ -681,18 +756,14 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Scheduled(cron = "0 25 9 * * TUE-FRI", zone = "GMT+05:00")
     public void sendMeetingLink() {
-        List<Long> list = new ArrayList<>(Arrays.asList(1631579869L, 626332730L, 507062102L, 282572312L, 1658439256L,
-                772963240L, 1606172234L, 514629519L));
-        for (Long aLong : list) {
+        for (Long aLong : dailyMeet) {
             sendMessage(aLong, DAILY_LINK_MEET + "\n" + "Доброе утро! Подключаемся к ежедневному миту в 09:30.");
         }
     }
 
     @Scheduled(cron = "0 55 9 * * MON", zone = "GMT+05:00")
     public void sendPlanningMeetingLink() {
-        List<Long> list = new ArrayList<>(Arrays.asList(1631579869L, 626332730L, 507062102L, 282572312L, 1658439256L,
-                772963240L, 1606172234L, 514629519L));
-        for (Long aLong : list) {
+        for (Long aLong : dailyMeet) {
             sendMessage(aLong, MONDAY_PLANNING_MEET_LINK + "\n" + "Доброе утро! Подключаемся к миту по планированию в 10:00.");
         }
     }
@@ -928,7 +999,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     enum BotState {
-        WAITING_FOR_USER_NAME, WAITING_FOR_CONFIRMATION, WAITING_FOR_USER_INFO, WAITING_FOR_MESSAGE, WAITING_FOR_NAME_FOR_ADD, IDLE
+        WAITING_FOR_USER_NAME, WAITING_FOR_CONFIRMATION, WAITING_FOR_USER_INFO, WAITING_FOR_MESSAGE, WAITING_FOR_NAME_FOR_ADD, WAITING_FOR_CHAT_ID_FOR_ADD_TO_DAILY_MEET, WAITING_FOR_CHAT_ID_FOR_DELETE_FROM_DAILY_MEET, IDLE
     }
 
     BotState botState = BotState.IDLE;
@@ -1050,6 +1121,19 @@ public class TelegramBot extends TelegramLongPollingBot {
             KeyboardRow row13 = new KeyboardRow();
             row13.add("  Удалить пользователя ⛔  ");
             keyboardRows.add(row13);
+        }
+        if (isChatAdmin(config.getBotAdmin(), chatId)) {
+            KeyboardRow row15 = new KeyboardRow();
+            row15.add("  Добавить юзера на daily meet \uD83D\uDCC5  ");
+            keyboardRows.add(row15);
+
+            KeyboardRow row16 = new KeyboardRow();
+            row16.add("  Удалить юзера из daily meet \uD83D\uDDD1\uFE0F  ");
+            keyboardRows.add(row16);
+
+            KeyboardRow row17 = new KeyboardRow();
+            row17.add("  список имя/chatId \uD83E\uDDFE  ");
+            keyboardRows.add(row17);
         }
         keyboardMarkup.setKeyboard(keyboardRows);
         message.setReplyMarkup(keyboardMarkup);

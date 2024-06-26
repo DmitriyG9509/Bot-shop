@@ -8,6 +8,8 @@ bot:
   hr:
     1: 337699101
     2: 296853243
+  admin:
+    1: 1658439256
 
 spring:
   datasource:

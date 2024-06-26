@@ -28,9 +28,13 @@ public class BotConfig {
     private Long hr1;
     @Value("${bot.hr.2}")
     private Long hr2;
+    @Value("${bot.admin.1}")
+    private Long admin1;
+
 
     public List<Long> getBotOwners() {
         return Arrays.asList(owner1, owner2, owner3);
     }
     public List<Long> getBotHr() {return Arrays.asList(hr1, hr2, owner1, owner3); }
+    public List<Long> getBotAdmin() {return Arrays.asList(admin1, owner1, owner3); }
 }
