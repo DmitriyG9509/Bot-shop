@@ -250,6 +250,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         dailyMeetRepo.save(dailyMeet);
         sendMessage(chatId, "Пользователь успешно добавлен на рассылку на daily meet");
         sendMessage(Long.parseLong(chatIdForAdd), "Вы добавлены на рассылку на daily meet");
+        botState = BotState.IDLE;
     }
 
     private void deleteUserToDailyMeetExecute(Long chatId, String chatIdForDelete) {
@@ -261,6 +262,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         dailyMeetRepo.deleteDailyMeetByChatId(Long.parseLong(chatIdForDelete));
         sendMessage(chatId, "Пользователь успешно удален из рассылки на daily meet");
         sendMessage(Long.parseLong(chatIdForDelete), "Вы удалены из рассылки на daily meet");
+        botState = BotState.IDLE;
     }
 
     private void sendUserTransactionHistory(Long chatId) {
