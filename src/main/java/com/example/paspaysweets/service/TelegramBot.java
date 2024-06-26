@@ -243,13 +243,13 @@ public class TelegramBot extends TelegramLongPollingBot {
         var entiry = dailyMeetRepo.findByChatId(Long.parseLong(chatIdForAdd));
         if (entiry.isPresent()) {
             sendMessage(chatId, "Пользователь уже получает ссылку на мит");
-            return;
+        } else {
+            DailyMeet dailyMeet = new DailyMeet();
+            dailyMeet.setChatId(Long.parseLong(chatIdForAdd));
+            dailyMeetRepo.save(dailyMeet);
+            sendMessage(chatId, "Пользователь успешно добавлен на рассылку на daily meet");
+            sendMessage(Long.parseLong(chatIdForAdd), "Вы добавлены на рассылку на daily meet");
         }
-        DailyMeet dailyMeet = new DailyMeet();
-        dailyMeet.setChatId(Long.parseLong(chatIdForAdd));
-        dailyMeetRepo.save(dailyMeet);
-        sendMessage(chatId, "Пользователь успешно добавлен на рассылку на daily meet");
-        sendMessage(Long.parseLong(chatIdForAdd), "Вы добавлены на рассылку на daily meet");
         botState = BotState.IDLE;
     }
 
@@ -257,11 +257,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         var entiry = dailyMeetRepo.findByChatId(Long.parseLong(chatIdForDelete));
         if (entiry.isEmpty()) {
             sendMessage(chatId, "Пользователь не получает рассылку");
-            return;
+        } else {
+            dailyMeetRepo.deleteDailyMeetByChatId(Long.parseLong(chatIdForDelete));
+            sendMessage(chatId, "Пользователь успешно удален из рассылки на daily meet");
+            sendMessage(Long.parseLong(chatIdForDelete), "Вы удалены из рассылки на daily meet");
         }
-        dailyMeetRepo.deleteDailyMeetByChatId(Long.parseLong(chatIdForDelete));
-        sendMessage(chatId, "Пользователь успешно удален из рассылки на daily meet");
-        sendMessage(Long.parseLong(chatIdForDelete), "Вы удалены из рассылки на daily meet");
         botState = BotState.IDLE;
     }
 
