@@ -268,7 +268,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         if (entiry.isEmpty()) {
             sendMessage(chatId, "Пользователь не получает рассылку");
         } else {
-            dailyMeetRepo.deleteDailyMeetByChatId(Long.parseLong(chatIdForDelete));
+            dailyMeetRepo.deleteByChatId(Long.parseLong(chatIdForDelete));
             sendMessage(chatId, "Пользователь успешно удален из рассылки на daily meet");
             sendMessage(Long.parseLong(chatIdForDelete), "Вы удалены из рассылки на daily meet");
         }
