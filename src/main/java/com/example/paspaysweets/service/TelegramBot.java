@@ -240,6 +240,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void addUserToDailyMeetExecute(Long chatId, String chatIdForAdd) {
+        var entiry = dailyMeetRepo.findByChatId(Long.parseLong(chatIdForAdd));
+        if (entiry.isPresent()) {
+            sendMessage(chatId, "Пользователь уже получает ссылку на мит");
+            return;
+        }
         DailyMeet dailyMeet = new DailyMeet();
         dailyMeet.setChatId(Long.parseLong(chatIdForAdd));
         dailyMeetRepo.save(dailyMeet);
@@ -248,6 +253,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void deleteUserToDailyMeetExecute(Long chatId, String chatIdForDelete) {
+        var entiry = dailyMeetRepo.findByChatId(Long.parseLong(chatIdForDelete));
+        if (entiry.isEmpty()) {
+            sendMessage(chatId, "Пользователь не получает рассылку");
+            return;
+        }
         dailyMeetRepo.deleteDailyMeetByChatId(Long.parseLong(chatIdForDelete));
         sendMessage(chatId, "Пользователь успешно удален из рассылки на daily meet");
         sendMessage(Long.parseLong(chatIdForDelete), "Вы удалены из рассылки на daily meet");
