@@ -55,17 +55,16 @@ public class TelegramBot extends TelegramLongPollingBot {
     private final UserNamesRepo userNamesRepo;
     private final CategoryRepo categoryRepo;
     private final TransactionsRepo transactionsRepo;
+    private final DailyMeetRepo dailyMeetRepo;
 
-    List<Long> dailyMeet = new ArrayList<>(Arrays.asList(1631579869L, 626332730L, 507062102L, 282572312L, 1658439256L,
-            772963240L, 1606172234L, 514629519L));
-
-    public TelegramBot(ProductRepo productRepo, UserRepo userRepo, BotConfig config, UserNamesRepo userNamesRepo, CategoryRepo categoryRepo, TransactionsRepo transactionsRepo) {
+    public TelegramBot(ProductRepo productRepo, UserRepo userRepo, BotConfig config, UserNamesRepo userNamesRepo, CategoryRepo categoryRepo, TransactionsRepo transactionsRepo, DailyMeetRepo dailyMeetRepo) {
         this.productRepo = productRepo;
         this.userRepo = userRepo;
         this.config = config;
         this.userNamesRepo = userNamesRepo;
         this.categoryRepo = categoryRepo;
         this.transactionsRepo = transactionsRepo;
+        this.dailyMeetRepo = dailyMeetRepo;
         List<BotCommand> listofCommands = new ArrayList<>();
         listofCommands.add(new BotCommand("/start", "начало"));
         listofCommands.add(new BotCommand("/info", "информация о боте"));
@@ -202,7 +201,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         var userEntity = userRepo.findAll();
         var finalList = new HashMap<Long, String>();
         for (ShopUser shopUser : userEntity) {
-            var userName = shopUser.getName();
+            var userName = shopUser.getFio();
             var userChatId = shopUser.getChatId();
             finalList.put(userChatId, userName);
         }
@@ -241,15 +240,17 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void addUserToDailyMeetExecute(Long chatId, String chatIdForAdd) {
-        dailyMeet.add(Long.parseLong(chatIdForAdd));
-        sendMessage(chatId, "Пользователь успешно добавлен на рассылку ссылки на daily meet");
-        sendMessage(Long.parseLong(chatIdForAdd), "Вы добавлены на рассылку ссылки на daily meet");
+        DailyMeet dailyMeet = new DailyMeet();
+        dailyMeet.setChatId(Long.parseLong(chatIdForAdd));
+        dailyMeetRepo.save(dailyMeet);
+        sendMessage(chatId, "Пользователь успешно добавлен на рассылку на daily meet");
+        sendMessage(Long.parseLong(chatIdForAdd), "Вы добавлены на рассылку на daily meet");
     }
 
     private void deleteUserToDailyMeetExecute(Long chatId, String chatIdForDelete) {
-        dailyMeet.add(Long.parseLong(chatIdForDelete));
-        sendMessage(chatId, "Пользователь успешно удален из рассылки ссылки на daily meet");
-        sendMessage(Long.parseLong(chatIdForDelete), "Вы удалены из рассылки ссылки на daily meet");
+        dailyMeetRepo.deleteDailyMeetByChatId(Long.parseLong(chatIdForDelete));
+        sendMessage(chatId, "Пользователь успешно удален из рассылки на daily meet");
+        sendMessage(Long.parseLong(chatIdForDelete), "Вы удалены из рассылки на daily meet");
     }
 
     private void sendUserTransactionHistory(Long chatId) {
@@ -756,15 +757,17 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     @Scheduled(cron = "0 25 9 * * TUE-FRI", zone = "GMT+05:00")
     public void sendMeetingLink() {
-        for (Long aLong : dailyMeet) {
-            sendMessage(aLong, DAILY_LINK_MEET + "\n" + "Доброе утро! Подключаемся к ежедневному миту в 09:30.");
+        var dailyMeetEntity = dailyMeetRepo.findAll();
+        for (DailyMeet meet : dailyMeetEntity) {
+            sendMessage(meet.getChatId(), DAILY_LINK_MEET + "\n" + "Доброе утро! Подключаемся к ежедневному миту в 09:30.");
         }
     }
 
     @Scheduled(cron = "0 55 9 * * MON", zone = "GMT+05:00")
     public void sendPlanningMeetingLink() {
-        for (Long aLong : dailyMeet) {
-            sendMessage(aLong, MONDAY_PLANNING_MEET_LINK + "\n" + "Доброе утро! Подключаемся к миту по планированию в 10:00.");
+        var dailyMeetEntity = dailyMeetRepo.findAll();
+        for (DailyMeet meet : dailyMeetEntity) {
+            sendMessage(meet.getChatId(), MONDAY_PLANNING_MEET_LINK + "\n" + "Доброе утро! Подключаемся к миту по планированию в 10:00.");
         }
     }
 
