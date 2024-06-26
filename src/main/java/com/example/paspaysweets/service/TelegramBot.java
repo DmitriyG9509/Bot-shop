@@ -240,6 +240,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void addUserToDailyMeetExecute(Long chatId, String chatIdForAdd) {
+        if (!chatIdForAdd.matches("\\d+")) {
+            sendMessage(chatId, "Ошибка: идентификатор чата должен содержать только цифры.");
+            botState = BotState.IDLE;
+            return;
+        }
         var entiry = dailyMeetRepo.findByChatId(Long.parseLong(chatIdForAdd));
         if (entiry.isPresent()) {
             sendMessage(chatId, "Пользователь уже получает ссылку на мит");
