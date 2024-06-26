@@ -259,6 +259,11 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void deleteUserToDailyMeetExecute(Long chatId, String chatIdForDelete) {
+        if (!chatIdForDelete.matches("\\d+")) {
+            sendMessage(chatId, "Ошибка: идентификатор чата должен содержать только цифры.");
+            botState = BotState.IDLE;
+            return;
+        }
         var entiry = dailyMeetRepo.findByChatId(Long.parseLong(chatIdForDelete));
         if (entiry.isEmpty()) {
             sendMessage(chatId, "Пользователь не получает рассылку");
